@@ -20,10 +20,18 @@ func maimaiCompatibilityPayload(apiName string, userID int64, body []byte) (inte
 	case "CreateToken":
 		return map[string]interface{}{"Bearer": maimaiConfigValue("maimai_bearer_token", "")}, true
 	case "CMUpsertUserPrintlog":
+		orderID := requestString(body, "orderId")
+		if orderID == "" {
+			orderID = "0"
+		}
+		serialID, err := nextPrintSerial()
+		if err != nil {
+			return nil, true
+		}
 		return map[string]interface{}{
 			"returnCode": 1,
-			"orderId":    requestString(body, "orderId"),
-			"serialId":   requestString(body, "serialId"),
+			"orderId":    orderID,
+			"serialId":   serialID,
 		}, true
 	case "CMGetSellingCard":
 		var cards []model.GameSellingCard

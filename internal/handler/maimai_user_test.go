@@ -479,3 +479,18 @@ func TestUpsertAndReadChargeAndFriendSeasonRanking(t *testing.T) {
 		})
 	}
 }
+
+func TestCMUpsertUserPrintlogReturnsUsableReceipt(t *testing.T) {
+	setupMaimaiTestDB(t)
+	req := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/CMUpsertUserPrintlogApi", strings.NewReader(`{}`))
+	res := httptest.NewRecorder()
+	MaimaiHandler(res, req)
+	var payload map[string]interface{}
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode printlog response: %v", err)
+	}
+	serialID, _ := payload["serialId"].(string)
+	if payload["returnCode"] != float64(1) || payload["orderId"] != "0" || len(serialID) != 20 {
+		t.Fatalf("printlog response=%v", payload)
+	}
+}
