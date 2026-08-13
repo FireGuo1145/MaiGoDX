@@ -16,7 +16,7 @@ import (
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
 )
 
-const terminalSessionTTL = 24 * time.Hour
+const terminalSessionTTL = 48 * time.Hour
 
 // HandleAllNetPowerOn authenticates a cabinet Keychip and returns its game URL.
 func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
@@ -97,24 +97,23 @@ func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 // HandleTerminalMaimai verifies the PowerOn session before dispatching game APIs.
 func HandleTerminalMaimai(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 5 || parts[0] != "gs" {
+	// AquaDX's interceptor accepts every /gs/{token}/... request shape, checks
+	// only the token, then rewrites it to /g/... for the game controller.
+	if len(parts) < 2 || parts[0] != "gs" || strings.TrimSpace(parts[1]) == "" {
 		http.Error(w, "", http.StatusForbidden)
 		return
 	}
 
 	var session model.TerminalSession
-	if lookup := database.DB.Where("token = ? AND expires_at > ?", parts[1], time.Now()).Limit(1).Find(&session); lookup.Error != nil || lookup.RowsAffected == 0 {
+	lookup := database.DB.Where("token = ? AND expires_at > ?", parts[1], time.Now()).Limit(1).Find(&session)
+	if lookup.Error != nil || lookup.RowsAffected == 0 {
 		http.Error(w, "", http.StatusForbidden)
 		return
 	}
-	var terminal model.Terminal
-	if lookup := database.DB.Where("id = ?", session.TerminalID).Limit(1).Find(&terminal); lookup.Error != nil || lookup.RowsAffected == 0 || !terminal.IsEnabled || !strings.EqualFold(terminal.GameID, parts[2]) {
-		http.Error(w, "", http.StatusForbidden)
-		return
-	}
-	terminal.LastSeenAt = time.Now()
-	terminal.LastSeenIP = clientIP(r)
-	_ = database.DB.Save(&terminal).Error
+	// Match AquaDX's KeychipSessionService.find(): every successful game request
+	// refreshes the idle expiry rather than imposing a fixed PowerOn lifetime.
+	session.ExpiresAt = time.Now().Add(terminalSessionTTL)
+	_ = database.DB.Save(&session).Error
 	MaimaiHandler(w, r)
 }
 
