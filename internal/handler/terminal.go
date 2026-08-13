@@ -66,16 +66,31 @@ func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 	if err := database.DB.Save(&terminal).Error; err != nil {
 		log.Printf("[MaiGoDX] ALL.Net PowerOn warning: failed to update terminal %d: %v", terminal.ID, err)
 	}
-	token, err := createTerminalSession(&terminal, gameID)
-	if err != nil {
-		log.Printf("[MaiGoDX] ALL.Net PowerOn session creation failed: keychip=%s error=%v", terminal.KeychipID, err)
-		http.Error(w, "", http.StatusInternalServerError)
-		return
-	}
 	base := forwardedHost(r)
-	uri := "http://" + base + "/gs/" + token + "/" + gameID + "/" + version + "/"
+	uriBase := "http://" + base
+	routeMode := "g"
+	sessionLog := "disabled"
+
+	// AquaDX only emits /gs/{token}/... when explicit Keychip protection is
+	// enabled. Its default PowerOn response uses /g/{game}/{version}/. Keep
+	// terminal registration for ownership and auditing, but make protection an
+	// opt-in server setting so ordinary clients retain AquaDX-compatible routes.
+	if allNetKeychipProtectionEnabled() {
+		token, err := createTerminalSession(&terminal, gameID)
+		if err != nil {
+			log.Printf("[MaiGoDX] ALL.Net PowerOn session creation failed: keychip=%s error=%v", terminal.KeychipID, err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+		routeMode = "gs"
+		sessionLog = compactTerminalToken(token)
+		uriBase += "/gs/" + token
+	} else {
+		uriBase += "/g"
+	}
+	uri := uriBase + "/" + gameID + "/" + version + "/"
 	fields := aquaPowerOnFields(uri, base, request["token"], request["format_ver"])
-	log.Printf("[MaiGoDX] ALL.Net PowerOn accepted: keychip=%s terminal=%d game=%s version=%s session=%s remote=%s", terminal.KeychipID, terminal.ID, gameID, version, compactTerminalToken(token), clientIP(r))
+	log.Printf("[MaiGoDX] ALL.Net PowerOn accepted: keychip=%s terminal=%d game=%s version=%s route=%s session=%s remote=%s", terminal.KeychipID, terminal.ID, gameID, version, routeMode, sessionLog, clientIP(r))
 	// AquaDX returns a plain URL-formatted response with a trailing newline.
 	// KanadeDX parses this with Split('&') and Split('='), so compressed DFI
 	// output or missing base fields causes its PowerOn parser to fail.
@@ -105,7 +120,18 @@ func HandleTerminalMaimai(w http.ResponseWriter, r *http.Request) {
 	if err := database.DB.Save(&session).Error; err != nil {
 		log.Printf("[MaiGoDX] ALL.Net SecureGame warning: failed to renew session=%s: %v", compactTerminalToken(token), err)
 	}
+
+	// AquaDX validates /gs/{token}/... and forwards it internally to the
+	// controller's canonical /g/... route before dispatching the game API.
+	r.URL.Path = "/g/" + strings.Join(parts[2:], "/")
+	r.URL.RawPath = ""
 	MaimaiHandler(w, r)
+}
+
+func allNetKeychipProtectionEnabled() bool {
+	var config model.SystemConfig
+	lookup := database.DB.Where(&model.SystemConfig{Key: "allnet_check_keychip"}).Limit(1).Find(&config)
+	return lookup.Error == nil && lookup.RowsAffected > 0 && strings.EqualFold(strings.TrimSpace(config.Value), "true")
 }
 
 func createTerminalSession(terminal *model.Terminal, gameID string) (string, error) {

@@ -105,6 +105,7 @@ func InitDB() {
 		{Key: "event_mode", Value: "false", Desc: "限时活动模式开关 (true/false)"},
 		{Key: "notice_banner", Value: "欢迎来到 MaiGoDX 街机服务器！", Desc: "全服公告横幅内容"},
 		{Key: "maimai_endpoint_salts", Value: "", Desc: "maimai 加密端点盐值；多个十六进制盐值以逗号分隔"},
+		{Key: "allnet_check_keychip", Value: "false", Desc: "ALL.Net Keychip 会话保护开关（true 时 PowerOn 下发 /gs/{token}/，false 时按 AquaDX 默认下发 /g/）"},
 		{Key: "maimai_recommend_select_music_ids", Value: "", Desc: "maimai 推荐选曲乐曲 ID；多个数字以逗号分隔"},
 		{Key: "maimai_recommend_rate_music_ids", Value: "", Desc: "maimai 推荐评级乐曲 ID；多个数字以逗号分隔"},
 		{Key: "maimai_weekly_mission_category", Value: "0", Desc: "maimai 周任务分类"},
