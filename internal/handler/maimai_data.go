@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
@@ -178,9 +179,30 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 	case "GetUserRating":
 		return userRating(userID), true, nil
 	case "GetGameRanking":
-		var ranking []model.UserDetail
-		database.DB.Order("rating desc, max_rating desc, id asc").Limit(100).Find(&ranking)
-		return map[string]interface{}{"userId": userID, "gameRankingList": ranking}, true, nil
+		var request map[string]json.RawMessage
+		_ = json.Unmarshal(body, &request)
+		var rankingType interface{}
+		_ = json.Unmarshal(request["type"], &rankingType)
+		if requestInt(body, "type") != 1 {
+			return map[string]interface{}{"type": rankingType, "gameRankingList": []interface{}{}}, true, nil
+		}
+		type musicRankingRow struct {
+			MusicID int
+			Weight  int64
+		}
+		cutoff := time.Now().AddDate(0, 0, -7).Format("2006-01-02 15:04:05")
+		var rows []musicRankingRow
+		if err := database.DB.Model(&model.UserPlaylog{}).
+			Select("music_id, COUNT(DISTINCT user_id) AS weight").
+			Where("user_play_date >= ?", cutoff).
+			Group("music_id").Order("weight desc, music_id asc").Limit(50).Find(&rows).Error; err != nil {
+			return nil, true, err
+		}
+		ranking := make([]map[string]interface{}, 0, len(rows))
+		for _, row := range rows {
+			ranking = append(ranking, map[string]interface{}{"id": row.MusicID, "point": row.Weight, "userName": ""})
+		}
+		return map[string]interface{}{"type": rankingType, "gameRankingList": ranking}, true, nil
 	case "GetGameSetting":
 		return gameSettingPayload(), true, nil
 	case "GetGameEvent":

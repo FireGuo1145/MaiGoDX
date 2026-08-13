@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
@@ -391,5 +392,45 @@ func TestGetUserItemUsesAquaDXItemKindPaging(t *testing.T) {
 				t.Fatalf("item=%v", item)
 			}
 		})
+	}
+}
+
+func TestGetGameRankingMatchesAquaDXMusicRanking(t *testing.T) {
+	setupMaimaiTestDB(t)
+	now := time.Now().Format("2006-01-02 15:04:05.0")
+	old := time.Now().AddDate(0, 0, -8).Format("2006-01-02 15:04:05.0")
+	plays := []model.UserPlaylog{
+		{UserID: 1, MusicID: 100, UserPlayDate: now}, {UserID: 2, MusicID: 100, UserPlayDate: now},
+		{UserID: 1, MusicID: 100, UserPlayDate: now}, {UserID: 3, MusicID: 200, UserPlayDate: now},
+		{UserID: 4, MusicID: 300, UserPlayDate: old},
+	}
+	if err := database.DB.Create(&plays).Error; err != nil {
+		t.Fatalf("create playlogs: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/GetGameRankingApi", strings.NewReader(`{"type":1}`))
+	res := httptest.NewRecorder()
+	MaimaiHandler(res, req)
+	var payload map[string]interface{}
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode ranking: %v", err)
+	}
+	list := payload["gameRankingList"].([]interface{})
+	if len(list) != 2 {
+		t.Fatalf("ranking list=%v", payload)
+	}
+	first := list[0].(map[string]interface{})
+	if first["id"] != float64(100) || first["point"] != float64(2) || first["userName"] != "" {
+		t.Fatalf("first ranking=%v", first)
+	}
+
+	nonMusicReq := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/GetGameRankingApi", strings.NewReader(`{"type":2}`))
+	nonMusicRes := httptest.NewRecorder()
+	MaimaiHandler(nonMusicRes, nonMusicReq)
+	var nonMusic map[string]interface{}
+	if err := json.Unmarshal(nonMusicRes.Body.Bytes(), &nonMusic); err != nil {
+		t.Fatalf("decode non-music ranking: %v", err)
+	}
+	if len(nonMusic["gameRankingList"].([]interface{})) != 0 {
+		t.Fatalf("non-music ranking=%v", nonMusic)
 	}
 }
