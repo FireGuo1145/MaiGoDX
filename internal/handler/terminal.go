@@ -74,37 +74,12 @@ func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 	}
 	base := forwardedHost(r)
 	uri := "http://" + base + "/gs/" + token + "/" + gameID + "/" + version + "/"
-	response := map[string]string{
-		"uri":             uri,
-		"host":            base,
-		"region0":         "1",
-		"allnet_id":       "456",
-		"client_timezone": "+0900",
-		"setting":         "",
-		"res_ver":         "3",
-		"token":           request["token"],
-	}
-	if strings.HasPrefix(request["format_ver"], "2") {
-		now := time.Now()
-		response["year"] = now.Format("2006")
-		response["month"] = now.Format("01")
-		response["day"] = now.Format("02")
-		response["hour"] = now.Format("15")
-		response["minute"] = now.Format("04")
-		response["second"] = now.Format("05")
-		response["timezone"] = "+09:00"
-		response["res_class"] = "PowerOnResponseV2"
-	}
-	encoded, err := encodeAllNet(response)
-	if err != nil {
-		log.Printf("[MaiGoDX] ALL.Net PowerOn response encoding failed: %v", err)
-		http.Error(w, "", http.StatusInternalServerError)
-		return
-	}
+	fields := aquaPowerOnFields(uri, base, request["token"], request["format_ver"])
 	log.Printf("[MaiGoDX] ALL.Net PowerOn accepted: keychip=%s terminal=%d game=%s version=%s session=%s remote=%s", terminal.KeychipID, terminal.ID, gameID, version, compactTerminalToken(token), clientIP(r))
-	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("Pragma", "DFI")
-	_, _ = w.Write(encoded)
+	// AquaDX returns a plain URL-formatted response with a trailing newline.
+	// KanadeDX parses this with Split('&') and Split('='), so compressed DFI
+	// output or missing base fields causes its PowerOn parser to fail.
+	writeAllNetPowerOn(w, fields)
 }
 
 // HandleTerminalMaimai verifies the PowerOn session before dispatching game APIs.
@@ -186,6 +161,61 @@ func forwardedHost(r *http.Request) string {
 		return forwarded
 	}
 	return r.Host
+}
+
+type allNetField struct {
+	key   string
+	value string
+}
+
+func aquaPowerOnFields(uri, host, clientToken, formatVersion string) []allNetField {
+	// Keep this ordered list aligned with AquaDX AllNetProps.map and AllNet.powerOn.
+	// Deliberately do not URL-escape or compress: AquaDX writes resp.toUrl()+"\n".
+	fields := []allNetField{
+		{key: "stat", value: "1"},
+		{key: "name", value: ""},
+		{key: "place_id", value: "123"},
+		{key: "region0", value: "1"},
+		{key: "region_name0", value: "W"},
+		{key: "region_name1", value: "X"},
+		{key: "region_name2", value: "Y"},
+		{key: "region_name3", value: "Z"},
+		{key: "country", value: "JPN"},
+		{key: "nickname", value: ""},
+		{key: "uri", value: uri},
+		{key: "host", value: host},
+	}
+	if strings.HasPrefix(formatVersion, "2") {
+		now := time.Now()
+		return append(fields,
+			allNetField{key: "year", value: now.Format("2006")},
+			allNetField{key: "month", value: now.Format("01")},
+			allNetField{key: "day", value: now.Format("02")},
+			allNetField{key: "hour", value: now.Format("15")},
+			allNetField{key: "minute", value: now.Format("04")},
+			allNetField{key: "second", value: now.Format("05")},
+			allNetField{key: "setting", value: "1"},
+			allNetField{key: "timezone", value: "+09:00"},
+			allNetField{key: "res_class", value: "PowerOnResponseV2"},
+		)
+	}
+	return append(fields,
+		allNetField{key: "allnet_id", value: "456"},
+		allNetField{key: "client_timezone", value: "+0900"},
+		allNetField{key: "utc_time", value: time.Now().UTC().Format("2006-01-02T15:04:05Z")},
+		allNetField{key: "setting", value: ""},
+		allNetField{key: "res_ver", value: "3"},
+		allNetField{key: "token", value: clientToken},
+	)
+}
+
+func writeAllNetPowerOn(w http.ResponseWriter, fields []allNetField) {
+	pairs := make([]string, 0, len(fields))
+	for _, field := range fields {
+		pairs = append(pairs, field.key+"="+field.value)
+	}
+	w.Header().Set("Content-Type", "text/plain")
+	_, _ = w.Write([]byte(strings.Join(pairs, "&") + "\n"))
 }
 
 func terminalReject(w http.ResponseWriter, r *http.Request, stage, reason string) {
