@@ -4,7 +4,7 @@ import "gorm.io/gorm"
 
 // UserDetail persists a maimai player profile. UserID is the game card external ID.
 type UserDetail struct {
-	gorm.Model
+	gorm.Model               `json:"-"`
 	UserID                   int64  `gorm:"uniqueIndex;not null" json:"userId"`
 	UserName                 string `json:"userName"`
 	IsNetMember              int    `json:"isNetMember"`
@@ -84,7 +84,7 @@ type UserDetail struct {
 }
 
 type UserOption struct {
-	gorm.Model
+	gorm.Model          `json:"-"`
 	UserID              int64 `gorm:"uniqueIndex;not null" json:"userId"`
 	OptionKind          int   `json:"optionKind"`
 	JudgeDisp           int   `json:"judgeDisp"`
@@ -138,7 +138,7 @@ type UserOption struct {
 }
 
 type UserExtend struct {
-	gorm.Model
+	gorm.Model                `json:"-"`
 	UserID                    int64  `gorm:"uniqueIndex;not null" json:"userId"`
 	SelectMusicID             int    `json:"selectMusicId"`
 	SelectDifficultyID        int    `json:"selectDifficultyId"`
@@ -162,7 +162,7 @@ type UserExtend struct {
 
 // UserPlaylog contains the complete persisted fields needed by score history, result views and rating trends.
 type UserPlaylog struct {
-	gorm.Model
+	gorm.Model            `json:"-"`
 	UserID                int64  `gorm:"index:idx_playlog_user_date" json:"userId"`
 	OrderID               int64  `json:"orderId"`
 	PlaylogID             int64  `json:"playlogId"`
@@ -246,7 +246,7 @@ type UserPlaylog struct {
 }
 
 type UserCharacter struct {
-	gorm.Model
+	gorm.Model  `json:"-"`
 	UserID      int64 `gorm:"uniqueIndex:idx_user_character;not null" json:"userId"`
 	CharacterID int   `gorm:"uniqueIndex:idx_user_character;not null" json:"characterId"`
 	Level       int   `json:"level"`
@@ -256,16 +256,16 @@ type UserCharacter struct {
 }
 
 type UserItem struct {
-	gorm.Model
-	UserID   int64 `gorm:"uniqueIndex:idx_user_item;not null" json:"userId"`
-	ItemKind int   `gorm:"uniqueIndex:idx_user_item;not null" json:"itemKind"`
-	ItemID   int   `gorm:"uniqueIndex:idx_user_item;not null" json:"itemId"`
-	Stock    int   `json:"stock"`
-	IsValid  bool  `json:"isValid"`
+	gorm.Model `json:"-"`
+	UserID     int64 `gorm:"uniqueIndex:idx_user_item;not null" json:"userId"`
+	ItemKind   int   `gorm:"uniqueIndex:idx_user_item;not null" json:"itemKind"`
+	ItemID     int   `gorm:"uniqueIndex:idx_user_item;not null" json:"itemId"`
+	Stock      int   `json:"stock"`
+	IsValid    bool  `json:"isValid"`
 }
 
 type UserMap struct {
-	gorm.Model
+	gorm.Model `json:"-"`
 	UserID     int64 `gorm:"uniqueIndex:idx_user_map;not null" json:"userId"`
 	MapID      int   `gorm:"uniqueIndex:idx_user_map;not null" json:"mapId"`
 	Distance   int   `json:"distance"`
@@ -275,7 +275,7 @@ type UserMap struct {
 }
 
 type UserFavorite struct {
-	gorm.Model
+	gorm.Model `json:"-"`
 	UserID     int64  `gorm:"uniqueIndex:idx_user_favorite;not null" json:"userId"`
 	FavUserID  int64  `json:"favUserId"`
 	ItemKind   int    `gorm:"uniqueIndex:idx_user_favorite;not null" json:"itemKind"`
@@ -284,7 +284,7 @@ type UserFavorite struct {
 }
 
 type UserMusicDetail struct {
-	gorm.Model
+	gorm.Model    `json:"-"`
 	UserID        int64 `gorm:"uniqueIndex:idx_user_music_detail;not null" json:"userId"`
 	MusicID       int   `gorm:"uniqueIndex:idx_user_music_detail;not null" json:"musicId"`
 	Level         int   `gorm:"uniqueIndex:idx_user_music_detail;not null" json:"level"`
@@ -298,7 +298,7 @@ type UserMusicDetail struct {
 }
 
 type UserCourse struct {
-	gorm.Model
+	gorm.Model          `json:"-"`
 	UserID              int64  `gorm:"uniqueIndex:idx_user_course;not null" json:"userId"`
 	CourseID            int    `gorm:"uniqueIndex:idx_user_course;not null" json:"courseId"`
 	IsLastClear         bool   `json:"isLastClear"`
@@ -315,7 +315,7 @@ type UserCourse struct {
 }
 
 type UserLoginBonus struct {
-	gorm.Model
+	gorm.Model `json:"-"`
 	UserID     int64 `gorm:"uniqueIndex:idx_user_login_bonus;not null" json:"userId"`
 	BonusID    int   `gorm:"uniqueIndex:idx_user_login_bonus;not null" json:"bonusId"`
 	Point      int   `json:"point"`
@@ -324,7 +324,7 @@ type UserLoginBonus struct {
 }
 
 type UserGeneralData struct {
-	gorm.Model
+	gorm.Model    `json:"-"`
 	UserID        int64  `gorm:"uniqueIndex:idx_user_general_data;not null" json:"userId"`
 	PropertyKey   string `gorm:"uniqueIndex:idx_user_general_data;not null" json:"propertyKey"`
 	PropertyValue string `gorm:"type:text" json:"propertyValue"`
@@ -338,7 +338,7 @@ type UserRate struct {
 }
 
 type UserUdemae struct {
-	gorm.Model
+	gorm.Model      `json:"-"`
 	UserID          int64 `gorm:"uniqueIndex;not null" json:"userId"`
 	Rate            int   `json:"rate"`
 	MaxRate         int   `json:"maxRate"`
@@ -367,7 +367,7 @@ type UserRatingPayload struct {
 }
 
 type UserKaleidx struct {
-	gorm.Model
+	gorm.Model          `json:"-"`
 	UserID              int64  `gorm:"uniqueIndex:idx_user_kaleidx;not null" json:"userId"`
 	GateID              int    `gorm:"uniqueIndex:idx_user_kaleidx;not null" json:"gateId"`
 	IsGateFound         bool   `json:"isGateFound"`
@@ -387,7 +387,7 @@ type UserKaleidx struct {
 }
 
 type UserIntimate struct {
-	gorm.Model
+	gorm.Model            `json:"-"`
 	UserID                int64 `gorm:"uniqueIndex:idx_user_intimate;not null" json:"userId"`
 	PartnerID             int   `gorm:"uniqueIndex:idx_user_intimate;not null" json:"partnerId"`
 	IntimateLevel         int   `json:"intimateLevel"`
@@ -395,7 +395,7 @@ type UserIntimate struct {
 }
 
 type UserGameCard struct {
-	gorm.Model
+	gorm.Model `json:"-"`
 	UserID     int64  `gorm:"uniqueIndex:idx_user_game_card;not null" json:"userId"`
 	CardID     int    `gorm:"uniqueIndex:idx_user_game_card;not null" json:"cardId"`
 	CardTypeID int    `json:"cardTypeId"`
@@ -406,7 +406,7 @@ type UserGameCard struct {
 }
 
 type UserPrintDetail struct {
-	gorm.Model
+	gorm.Model      `json:"-"`
 	UserID          int64  `gorm:"index;not null" json:"userId"`
 	UserGameCardID  uint   `json:"-"`
 	OrderID         int64  `json:"orderId"`
@@ -433,14 +433,14 @@ type UserPrintDetail struct {
 
 // UserRegion tracks a player's play count in a game region, matching AquaDX UserRegions.
 type UserRegion struct {
-	gorm.Model
-	UserID    int64 `gorm:"uniqueIndex:idx_user_region;not null" json:"userId"`
-	RegionID  int   `gorm:"uniqueIndex:idx_user_region;not null" json:"regionId"`
-	PlayCount int   `json:"playCount"`
+	gorm.Model `json:"-"`
+	UserID     int64 `gorm:"uniqueIndex:idx_user_region;not null" json:"userId"`
+	RegionID   int   `gorm:"uniqueIndex:idx_user_region;not null" json:"regionId"`
+	PlayCount  int   `json:"playCount"`
 }
 
 type UserActivity struct {
-	gorm.Model
+	gorm.Model `json:"-"`
 	UserID     int64 `gorm:"index;not null" json:"userId"`
 	Kind       int   `json:"kind"`
 	ActivityID int   `json:"id"`
