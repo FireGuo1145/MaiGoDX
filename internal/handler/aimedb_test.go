@@ -31,3 +31,31 @@ func TestAimeFelicaAccessCodeMatchesAquaDXConversion(t *testing.T) {
 		})
 	}
 }
+
+func TestAimeRegisterDuplicateMatchesAquaDX(t *testing.T) {
+	setupMaimaiTestDB(t)
+	request := make([]byte, 0x30)
+	copy(request[0x20:0x2a], []byte{0x50, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01})
+
+	first, _, err := aimeRegister(request)
+	if err != nil {
+		t.Fatalf("first registration: %v", err)
+	}
+	if status := binary.LittleEndian.Uint16(first[0x08:0x0a]); status != 1 {
+		t.Fatalf("first registration status=%d, want 1", status)
+	}
+	if got := binary.LittleEndian.Uint64(first[0x20:0x28]); got == 0 {
+		t.Fatal("first registration returned zero Aime ID")
+	}
+
+	duplicate, _, err := aimeRegister(request)
+	if err != nil {
+		t.Fatalf("duplicate registration: %v", err)
+	}
+	if status := binary.LittleEndian.Uint16(duplicate[0x08:0x0a]); status != 0 {
+		t.Fatalf("duplicate registration status=%d, want 0", status)
+	}
+	if got := binary.LittleEndian.Uint64(duplicate[0x20:0x28]); got != 0 {
+		t.Fatalf("duplicate registration Aime ID=%d, want 0", got)
+	}
+}

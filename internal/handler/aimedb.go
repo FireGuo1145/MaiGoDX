@@ -70,9 +70,12 @@ func serveAimeDBConnection(conn net.Conn) {
 	requestType := binary.LittleEndian.Uint16(request[0x04:0x06])
 	gameID := trimAimeASCII(request[0x0a:0x10])
 	keychip := trimAimeASCII(request[0x14:0x20])
-	if requestType != 0x13 && !aimeDBKeychipExists(keychip) {
+	if requestType != 0x13 && !aimeDBKeychipExists(keychip) && !allNetKeychipPermissive() {
 		log.Printf("[MaiGoDX] AimeDB rejected: unknown Keychip=%s type=0x%02x game=%s remote=%s", keychip, requestType, gameID, remote)
 		return
+	}
+	if requestType != 0x13 && !aimeDBKeychipExists(keychip) && allNetKeychipPermissive() {
+		log.Printf("[MaiGoDX] AimeDB permissive compatibility: accepting unknown Keychip=%s type=0x%02x game=%s remote=%s", keychip, requestType, gameID, remote)
 	}
 
 	response, summary, err := handleAimeDBRequest(requestType, request)
@@ -235,17 +238,22 @@ func aimeRegister(request []byte) ([]byte, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	aimeID, created, err := aimeCardID(accessCode, true)
+	_, found, err := aimeCardID(accessCode, false)
 	if err != nil {
 		return nil, "", err
 	}
 	status := uint16(0)
-	if created {
+	aimeID := int64(0)
+	if !found {
+		aimeID, _, err = aimeCardID(accessCode, true)
+		if err != nil {
+			return nil, "", err
+		}
 		status = 1
 	}
 	response := aimeStaticResponse(0x30, 0x06, status)
 	binary.LittleEndian.PutUint64(response[0x20:0x28], uint64(aimeID))
-	return response, fmt.Sprintf("register access=%s created=%t aimeId=%d", maskAimeAccessCode(accessCode), created, aimeID), nil
+	return response, fmt.Sprintf("register access=%s created=%t aimeId=%d", maskAimeAccessCode(accessCode), status == 1, aimeID), nil
 }
 
 func aimeFelicaLookupV1(request []byte) ([]byte, string, error) {
