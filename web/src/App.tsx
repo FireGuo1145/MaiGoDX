@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import api from '@/lib/api'
 import { AdminPage } from '@/pages/AdminPage'
@@ -11,14 +12,30 @@ import { SetupPage } from '@/pages/SetupPage'
 import type { PageId, Stats, SystemConfig, UserAccount, UserCard } from '@/types'
 import { apiErrorMessage } from '@/types'
 
+const pagePaths: Record<PageId, string> = {
+  home: '/',
+  dashboard: '/dashboard',
+  maimai: '/maimai',
+  setup: '/setup',
+  admin: '/admin',
+  settings: '/settings',
+}
+
+function pageFromPath(pathname: string): PageId {
+  const match = (Object.entries(pagePaths) as [PageId, string][]).find(([, path]) => path === pathname)
+  return match?.[0] ?? 'home'
+}
+
 export default function App() {
   const [user, setUser] = useState<UserAccount | null>(null)
-  const [page, setPage] = useState<PageId>('home')
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [stats, setStats] = useState<Stats | null>(null)
   const [cards, setCards] = useState<UserCard[]>([])
   const [users, setUsers] = useState<UserAccount[]>([])
   const [configs, setConfigs] = useState<SystemConfig[]>([])
+  const location = useLocation()
+  const navigate = useNavigate()
+  const page = pageFromPath(location.pathname)
 
   const refreshStats = async () => {
     if (!user) return
@@ -71,48 +88,40 @@ export default function App() {
   const logout = () => {
     void api.logout()
     setUser(null)
-    setPage('home')
     setStats(null)
     setCards([])
     setUsers([])
     setConfigs([])
+    navigate('/', { replace: true })
   }
 
   if (!user) {
-    return <AuthPage onAuthenticated={(account) => { setUser(account); setPage('dashboard') }} />
+    return <AuthPage onAuthenticated={(account) => { setUser(account); navigate('/dashboard', { replace: true }) }} />
   }
-
-  const content = (() => {
-    switch (page) {
-      case 'home':
-        return <HomePage stats={stats} />
-      case 'dashboard':
-        return <DashboardPage stats={stats} />
-      case 'maimai':
-        return <MaimaiPage stats={stats} />
-      case 'setup':
-        return <SetupPage />
-      case 'admin':
-        return user.isAdmin
-          ? <AdminPage users={users} configs={configs} onUsersChanged={refreshUsers} onConfigsChanged={refreshConfigs} />
-          : <HomePage stats={stats} />
-      case 'settings':
-        return <SettingsPage user={user} cards={cards} onCardsChanged={refreshCards} />
-      default:
-        return <HomePage stats={stats} />
-    }
-  })()
 
   return (
     <AppShell
       user={user}
       activePage={page}
       isSidebarOpen={isSidebarOpen}
-      onNavigate={setPage}
+      onNavigate={(target) => navigate(pagePaths[target])}
       onToggleSidebar={() => setIsSidebarOpen((open) => !open)}
       onLogout={logout}
     >
-      {content}
+      <Routes>
+        <Route path="/" element={<HomePage stats={stats} />} />
+        <Route path="/dashboard" element={<DashboardPage stats={stats} />} />
+        <Route path="/maimai" element={<MaimaiPage stats={stats} />} />
+        <Route path="/setup" element={<SetupPage />} />
+        <Route path="/settings" element={<SettingsPage user={user} cards={cards} onCardsChanged={refreshCards} />} />
+        <Route
+          path="/admin"
+          element={user.isAdmin
+            ? <AdminPage users={users} configs={configs} onUsersChanged={refreshUsers} onConfigsChanged={refreshConfigs} />
+            : <Navigate to="/" replace />}
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </AppShell>
   )
 }

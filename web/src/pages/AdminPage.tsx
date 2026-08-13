@@ -66,11 +66,9 @@ export function AdminPage({ users, configs, onUsersChanged, onConfigsChanged }: 
         <Card className="bg-slate-900 border-slate-800 overflow-hidden">
           <Table>
             <TableHeader className="bg-slate-800/50">
-              <TableRow>
                 <TableHead className="text-slate-300">User</TableHead>
                 <TableHead className="text-slate-300">Status</TableHead>
                 <TableHead className="text-slate-300">Role</TableHead>
-              </TableRow>
             </TableHeader>
             <TableBody>
               {users.length ? users.map((account) => (
@@ -84,7 +82,7 @@ export function AdminPage({ users, configs, onUsersChanged, onConfigsChanged }: 
                   <TableCell>{account.isVerified ? <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Verified</Badge> : <Badge variant="outline" className="text-slate-500 border-slate-800">Pending</Badge>}</TableCell>
                   <TableCell>{account.isAdmin ? <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20">Admin</Badge> : <Badge variant="outline" className="text-slate-500 border-slate-800">User</Badge>}</TableCell>
                 </TableRow>
-              )) : <TableRow><TableCell colSpan={3} className="text-center py-10 text-slate-500">No users found.</TableCell></TableRow>}
+              )) : <TableRow><TableCell className="text-center py-10 text-slate-500">No users found.</TableCell><TableCell /><TableCell /></TableRow>}
             </TableBody>
           </Table>
         </Card>

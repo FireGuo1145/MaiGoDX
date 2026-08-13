@@ -23,13 +23,11 @@ export function MaimaiPage({ stats }: MaimaiPageProps) {
           <Card className="bg-slate-900 border-slate-800 overflow-hidden">
             <Table>
               <TableHeader className="bg-slate-800/50">
-                <TableRow>
                   <TableHead className="text-slate-300">Music</TableHead>
                   <TableHead className="text-slate-300">Level</TableHead>
                   <TableHead className="text-slate-300 text-right">Achievement</TableHead>
                   <TableHead className="text-slate-300 text-right">Score</TableHead>
                   <TableHead className="text-slate-300 text-right">Date</TableHead>
-                </TableRow>
               </TableHeader>
               <TableBody>
                 {plays.length ? plays.map((play) => (
@@ -41,7 +39,7 @@ export function MaimaiPage({ stats }: MaimaiPageProps) {
                     <TableCell className="text-right text-slate-500 text-xs">{play.createDate || '—'}</TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow><TableCell colSpan={5} className="text-center py-12 text-slate-500">No play history found.</TableCell></TableRow>
+                  <TableRow><TableCell className="text-center py-12 text-slate-500">No play history found.</TableCell><TableCell /><TableCell /><TableCell /><TableCell /></TableRow>
                 )}
               </TableBody>
             </Table>

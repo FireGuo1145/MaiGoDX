@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Yarn generated state
+.pnp.*
+.yarn/install-state.gz
+
