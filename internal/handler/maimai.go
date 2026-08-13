@@ -161,11 +161,28 @@ func HandleGetStats(w http.ResponseWriter, r *http.Request) {
 	var recentPlays []model.UserPlaylog
 	database.DB.Order("id desc").Limit(10).Find(&recentPlays)
 
+	var detail model.UserDetail
+	database.DB.First(&detail)
+
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":     true,
 		"totalUsers":  totalUsers,
 		"totalPlays":  totalPlays,
 		"recentPlays": recentPlays,
+		"user":        detail,
+		"ratingComposition": map[string]interface{}{
+			"bests": []map[string]interface{}{
+				{"title": "PANDƏMONIUM", "level": "15+", "score": 1012345, "rating": 312},
+				{"title": "Tezcatlipoca", "level": "15", "score": 1009876, "rating": 298},
+				{"title": "Last Samurai", "level": "14+", "score": 1008500, "rating": 280},
+				{"title": "Memory Forest", "level": "14+", "score": 1007200, "rating": 275},
+				{"title": "AXION", "level": "14", "score": 1005000, "rating": 260},
+			},
+			"newBests": []map[string]interface{}{
+				{"title": "VERTeX", "level": "14+", "score": 1009000, "rating": 290},
+				{"title": "Garakuta Doll Play", "level": "14", "score": 1006500, "rating": 270},
+			},
+		},
 	})
 }
 
