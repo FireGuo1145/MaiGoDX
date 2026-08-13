@@ -431,6 +431,14 @@ type UserPrintDetail struct {
 	Created         string `json:"created"`
 }
 
+// UserRegion tracks a player's play count in a game region, matching AquaDX UserRegions.
+type UserRegion struct {
+	gorm.Model
+	UserID    int64 `gorm:"uniqueIndex:idx_user_region;not null" json:"userId"`
+	RegionID  int   `gorm:"uniqueIndex:idx_user_region;not null" json:"regionId"`
+	PlayCount int   `json:"playCount"`
+}
+
 type UserActivity struct {
 	gorm.Model
 	UserID     int64 `gorm:"index;not null" json:"userId"`

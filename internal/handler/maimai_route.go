@@ -10,15 +10,15 @@ import (
 )
 
 var maimaiAPINames = []string{
-	"GetGameChargeApi", "GetGameEventApi", "GetGameFestaApi", "GetGameMusicScoreApi", "GetGameNgMusicIdApi", "GetGameRankingApi", "GetGameSettingApi", "GetGameWeeklyDataApi", "GetGameMapAreaConditionApi",
+	"GetGameChargeApi", "GetGameEventApi", "GetGameFestaApi", "GetGameKaleidxScopeApi", "GetGameMusicScoreApi", "GetGameNationalDataApi", "GetGameNgMusicIdApi", "GetGameRankingApi", "GetGameSettingApi", "GetGameTournamentInfoApi", "GetGameWeeklyDataApi", "GetGameMapAreaConditionApi",
 	"GetPlaceCircleDataApi", "GetUserActivityApi", "GetUserCardApi", "GetUserCardPrintErrorApi", "GetUserCharacterApi",
 	"GetUserCircleChallengeApi", "GetUserCircleDataApi", "GetUserCirclePointDataApi", "GetUserCirclePointRankingApi", "GetUserCourseApi", "GetUserDataApi", "GetUserExtendApi", "GetUserFavoriteApi",
-	"GetUserFavoriteItemApi", "GetUserFestaApi", "GetUserGhostApi", "GetUserIntimateApi", "GetUserItemApi",
-	"GetUserKaleidxScopeApi", "GetUserLoginBonusApi", "GetUserMapApi", "GetUserMissionDataApi", "GetUserMusicApi",
-	"GetUserOptionApi", "GetUserPreviewApi", "GetUserRatingApi", "GetUserRecommendRateMusicApi", "GetUserRecommendSelectMusicApi", "GetUserScoreRankingApi",
+	"GetUserFavoriteItemApi", "GetUserFestaApi", "GetUserFriendBonusApi", "GetUserFriendCheckApi", "GetUserGhostApi", "GetUserIntimateApi", "GetUserItemApi",
+	"GetUserKaleidxScopeApi", "GetUserLoginBonusApi", "GetUserMapApi", "GetUserMissionDataApi", "GetUserMusicApi", "GetUserNewItemApi", "GetUserNewItemListApi",
+	"GetUserOptionApi", "GetUserPreviewApi", "GetUserRatingApi", "GetUserRecommendRateMusicApi", "GetUserRecommendSelectMusicApi", "GetUserRegionApi", "GetUserRivalDataApi", "GetUserRivalMusicApi", "GetUserScoreRankingApi", "GetUserShopStockApi",
 	"UploadUserPhotoApi", "UploadUserPlaylogApi", "UploadUserPlaylogListApi", "UpsertUserAllApi", "UpsertUserChargelogApi",
 	"UpsertUserPlaceCircleRegistApi", "UpsertUserPrintApi", "UpsertClientBookkeepingApi", "UpsertClientPlayTimeApi", "UpsertClientSettingApi", "UpsertClientTestmodeApi", "UpsertClientUploadApi",
-	"CMGetUserCharacterApi", "CMGetUserDataApi", "CMGetUserItemApi", "CMGetUserPreviewApi", "CMLoginApi", "CMLogoutApi", "CMUpsertBuyCardApi", "CMUpsertUserPrintApi", "Ping", "RemoveTokenApi", "UserLoginApi", "UserLogoutApi",
+	"CMGetSellingCardApi", "CMGetUserCharacterApi", "CMGetUserDataApi", "CMGetUserItemApi", "CMGetUserPreviewApi", "CMLoginApi", "CMLogoutApi", "CMUpsertBuyCardApi", "CMUpsertUserPrintApi", "CMUpsertUserPrintlogApi", "CreateTokenApi", "GetTransferFriendApi", "Ping", "RemoveTokenApi", "UserFriendRegistApi", "UserLoginApi", "UserLogoutApi",
 }
 
 func resolveMaimaiAPI(rawAPI, requestPath string) string {

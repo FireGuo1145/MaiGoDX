@@ -17,3 +17,13 @@ type GameCharge struct {
 	StartDate string `json:"startDate"`
 	EndDate   string `json:"endDate"`
 }
+
+// GameSellingCard is a CardMaker card definition delivered by CMGetSellingCardApi.
+// Its field names and date semantics match AquaDX Mai2GameSellingCard.
+type GameSellingCard struct {
+	CardID          int    `gorm:"primaryKey" json:"cardId"`
+	StartDate       string `json:"startDate"`
+	EndDate         string `json:"endDate"`
+	NoticeStartDate string `json:"noticeStartDate"`
+	NoticeEndDate   string `json:"noticeEndDate"`
+}

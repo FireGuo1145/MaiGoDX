@@ -25,8 +25,8 @@ func setupMaimaiTestDB(t *testing.T) {
 		&model.SystemConfig{}, &model.UserDetail{}, &model.UserOption{}, &model.UserExtend{}, &model.UserPlaylog{},
 		&model.UserCharacter{}, &model.UserItem{}, &model.UserMap{}, &model.UserFavorite{},
 		&model.UserMusicDetail{}, &model.UserCourse{}, &model.UserLoginBonus{}, &model.UserGeneralData{},
-		&model.UserUdemae{}, &model.UserKaleidx{}, &model.UserIntimate{}, &model.UserActivity{},
-		&model.UserGameCard{}, &model.UserPrintDetail{},
+		&model.UserUdemae{}, &model.UserKaleidx{}, &model.UserIntimate{}, &model.UserActivity{}, &model.UserRegion{},
+		&model.UserGameCard{}, &model.UserPrintDetail{}, &model.GameSellingCard{},
 	); err != nil {
 		t.Fatalf("migrate test database: %v", err)
 	}
@@ -143,4 +143,81 @@ func TestUpsertUserPrintPersistsCardAndReceipt(t *testing.T) {
 	}
 	assertRows(t, &model.UserGameCard{}, 1)
 	assertRows(t, &model.UserPrintDetail{}, 1)
+}
+
+func TestAquaDXParityEndpointsUseExpectedResponseShapes(t *testing.T) {
+	setupMaimaiTestDB(t)
+	if err := database.DB.Create(&model.GameSellingCard{CardID: 7, StartDate: "2026-01-01 00:00:00.0", EndDate: "2027-01-01 00:00:00.0"}).Error; err != nil {
+		t.Fatalf("create selling card: %v", err)
+	}
+	if err := database.DB.Create(&model.UserDetail{UserID: 100, UserName: "Owner"}).Error; err != nil {
+		t.Fatalf("create owner: %v", err)
+	}
+	if err := database.DB.Create(&model.UserDetail{UserID: 200, UserName: "Rival"}).Error; err != nil {
+		t.Fatalf("create rival: %v", err)
+	}
+	var rival model.UserDetail
+	if err := database.DB.Where("user_id = ?", 200).First(&rival).Error; err != nil {
+		t.Fatalf("load rival: %v", err)
+	}
+	if err := database.DB.Create(&model.UserMusicDetail{UserID: int64(rival.ID), MusicID: 42, Level: 3, Achievement: 999999, DeluxScoreMax: 1234}).Error; err != nil {
+		t.Fatalf("create rival music: %v", err)
+	}
+
+	tests := []struct {
+		name  string
+		path  string
+		body  string
+		check func(t *testing.T, payload map[string]interface{})
+	}{
+		{
+			name: "selling cards", path: "/g/SDEZ/24000/Maimai2Servlet/CMGetSellingCardApi", body: `{}`,
+			check: func(t *testing.T, payload map[string]interface{}) {
+				if payload["length"] != float64(1) {
+					t.Fatalf("selling-card length=%v", payload["length"])
+				}
+			},
+		},
+		{
+			name: "rival music", path: "/g/SDEZ/24000/Maimai2Servlet/GetUserRivalMusicApi", body: fmt.Sprintf(`{"userId":100,"rivalId":%d}`, rival.ID),
+			check: func(t *testing.T, payload map[string]interface{}) {
+				if payload["rivalId"] != float64(rival.ID) {
+					t.Fatalf("rivalId=%v", payload["rivalId"])
+				}
+				list, ok := payload["userRivalMusicList"].([]interface{})
+				if !ok || len(list) != 1 {
+					t.Fatalf("rival music list=%v", payload["userRivalMusicList"])
+				}
+			},
+		},
+		{
+			name: "user login region", path: "/g/SDEZ/24000/Maimai2Servlet/UserLoginApi", body: `{"userId":100,"regionId":12}`,
+			check: func(t *testing.T, payload map[string]interface{}) {
+				if payload["returnCode"] != float64(1) {
+					t.Fatalf("login response=%v", payload)
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, test.path, strings.NewReader(test.body))
+			res := httptest.NewRecorder()
+			MaimaiHandler(res, req)
+			var payload map[string]interface{}
+			if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			test.check(t, payload)
+		})
+	}
+
+	var region model.UserRegion
+	if err := database.DB.Where("user_id = ? AND region_id = ?", 100, 12).First(&region).Error; err != nil {
+		t.Fatalf("persist user region: %v", err)
+	}
+	if region.PlayCount != 0 {
+		t.Fatalf("new region playCount=%d, want 0 to match AquaDX", region.PlayCount)
+	}
 }
