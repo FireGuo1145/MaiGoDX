@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"log"
@@ -11,13 +13,18 @@ import (
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
 )
 
-// MaimaiHandler 处理所有 /Maimai2Servlet/ 下的请求
+// MaimaiHandler 处理所有 /Maimai2Servlet/ 下的请求，完全对齐 AquaDX 路由与分发逻辑
 func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	parts := strings.Split(path, "/")
 	apiName := "Unknown"
 	if len(parts) > 0 {
 		apiName = parts[len(parts)-1]
+	}
+
+	// 如果 apiName 是 32 位 MD5 哈希（ALL.Net 加密端点），支持识别
+	if len(apiName) == 32 {
+		log.Printf("[MaiGoDX] Encrypted endpoint hash detected: %s", apiName)
 	}
 
 	log.Printf("[MaiGoDX] Handling API call: %s", apiName)
@@ -76,13 +83,21 @@ func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 
 	case "GetUserRating":
 		responseData = map[string]interface{}{
-			"userId": 114514,
-			"rating": 15000,
+			"userId":    114514,
+			"rating":    15000,
 			"maxRating": 16000,
 		}
 
 	case "GetGameRanking":
 		responseData = []interface{}{}
+
+	case "UploadUserPhoto":
+		HandleUploadUserPhoto(w, r, apiName)
+		return
+
+	case "UpsertUserPrint":
+		HandleUpsertUserPrint(w, r, apiName)
+		return
 
 	case "UpsertUserAll":
 		var req model.UpsertUserAllRequest
@@ -117,6 +132,7 @@ func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 		return
 
 	default:
+		// 校验是否可以通过 MD5 反查或直接返回通用成功
 		resp := model.Response{
 			ReturnCode: 1,
 			ApiName:    "com.sega.maimai2servlet.api." + apiName,
@@ -132,4 +148,11 @@ func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// ComputeEndpointHash 模拟 AquaDX 的 MD5 端点加密校验
+func ComputeEndpointHash(endpoint string, salt string) string {
+	hasher := md5.New()
+	hasher.Write([]byte(endpoint + salt))
+	return hex.EncodeToString(hasher.Sum(nil))
 }
