@@ -13,6 +13,23 @@ type UserAccount struct {
 	IsAdmin      bool   `gorm:"default:false" json:"isAdmin"`
 }
 
+// UserCard 对应 Aime 卡片绑定模型
+type UserCard struct {
+	gorm.Model
+	UserID        uint   `json:"userId"`
+	AccessCode    string `gorm:"uniqueIndex;not null" json:"accessCode"` // 20位卡号
+	CardId        string `json:"cardId"`                                // ICCard ID
+	CardName      string `json:"cardName"`                              // 卡片备注名
+}
+
+// SystemConfig 对应系统下发配置模型（管理员可控）
+type SystemConfig struct {
+	gorm.Model
+	Key   string `gorm:"uniqueIndex;not null" json:"key"`
+	Value string `json:"value"`
+	Desc  string `json:"desc"`
+}
+
 // RegisterRequest 注册请求体
 type RegisterRequest struct {
 	Email    string `json:"email"`
@@ -30,4 +47,17 @@ type LoginRequest struct {
 type VerifyEmailRequest struct {
 	Email string `json:"email"`
 	Token string `json:"token"`
+}
+
+// BindCardRequest 卡片绑定请求体
+type BindCardRequest struct {
+	Email      string `json:"email"`
+	AccessCode string `json:"accessCode"`
+	CardName   string `json:"cardName"`
+}
+
+// UpdateConfigRequest 更新系统配置请求体
+type UpdateConfigRequest struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }

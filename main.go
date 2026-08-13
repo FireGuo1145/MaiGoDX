@@ -21,11 +21,15 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// 注册认证与管理 API 路由
+	// 注册认证、管理与卡片绑定 API 路由
 	mux.HandleFunc("/api/auth/register", handler.HandleRegister)
 	mux.HandleFunc("/api/auth/login", handler.HandleLogin)
 	mux.HandleFunc("/api/auth/verify", handler.HandleVerifyEmail)
 	mux.HandleFunc("/api/admin/users", handler.HandleAdminUsers)
+	mux.HandleFunc("/api/admin/config/get", handler.HandleGetConfigs)
+	mux.HandleFunc("/api/admin/config/update", handler.HandleUpdateConfig)
+	mux.HandleFunc("/api/card/bind", handler.HandleBindCard)
+	mux.HandleFunc("/api/card/list", handler.HandleGetUserCards)
 	mux.HandleFunc("/api/stats", handler.HandleGetStats)
 
 	// 托管前端静态资源
