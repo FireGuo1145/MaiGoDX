@@ -103,12 +103,12 @@ func HandleTerminalMaimai(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var session model.TerminalSession
-	if err := database.DB.Where("token = ? AND expires_at > ?", parts[1], time.Now()).First(&session).Error; err != nil {
+	if lookup := database.DB.Where("token = ? AND expires_at > ?", parts[1], time.Now()).Limit(1).Find(&session); lookup.Error != nil || lookup.RowsAffected == 0 {
 		http.Error(w, "", http.StatusForbidden)
 		return
 	}
 	var terminal model.Terminal
-	if err := database.DB.First(&terminal, session.TerminalID).Error; err != nil || !terminal.IsEnabled || !strings.EqualFold(terminal.GameID, parts[2]) {
+	if lookup := database.DB.Where("id = ?", session.TerminalID).Limit(1).Find(&terminal); lookup.Error != nil || lookup.RowsAffected == 0 || !terminal.IsEnabled || !strings.EqualFold(terminal.GameID, parts[2]) {
 		http.Error(w, "", http.StatusForbidden)
 		return
 	}
@@ -131,22 +131,24 @@ func createTerminalSession(terminal *model.Terminal, gameID string) (string, err
 func findTerminalByKeychip(value string) (model.Terminal, error) {
 	keychip := normalizeKeychip(value)
 	var terminal model.Terminal
-	if err := database.DB.Where("keychip_id = ?", keychip).First(&terminal).Error; err == nil {
-		return terminal, nil
+	lookup := database.DB.Where("keychip_id = ?", keychip).Limit(1).Find(&terminal)
+	if lookup.Error != nil || lookup.RowsAffected > 0 {
+		return terminal, lookup.Error
 	}
-	// Segatools commonly sends the 11-character Keychip prefix. Mirror AquaDX's
-	// generated 1337 suffix fallback before accepting any matching full serial.
+
+	// Segatools commonly sends the 11-character Keychip prefix. Try AquaDX's
+	// conventional 1337 suffix before accepting another full serial with it.
 	if len(keychip) == 11 {
-		if err := database.DB.Where("keychip_id = ?", keychip+"1337").First(&terminal).Error; err == nil {
-			return terminal, nil
+		lookup = database.DB.Where("keychip_id = ?", keychip+"1337").Limit(1).Find(&terminal)
+		if lookup.Error != nil || lookup.RowsAffected > 0 {
+			return terminal, lookup.Error
 		}
-		if err := database.DB.Where("keychip_id LIKE ?", keychip+"%").First(&terminal).Error; err == nil {
-			return terminal, nil
-		} else {
-			return model.Terminal{}, err
+		lookup = database.DB.Where("keychip_id LIKE ?", keychip+"%").Order("id asc").Limit(1).Find(&terminal)
+		if lookup.Error != nil || lookup.RowsAffected > 0 {
+			return terminal, lookup.Error
 		}
 	}
-	return model.Terminal{}, database.DB.Where("keychip_id = ?", keychip).First(&terminal).Error
+	return model.Terminal{}, nil
 }
 
 func normalizeKeychip(value string) string {

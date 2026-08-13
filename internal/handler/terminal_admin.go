@@ -57,7 +57,16 @@ func HandleCreateTerminal(w http.ResponseWriter, r *http.Request) {
 	// Older revisions used GORM soft deletion. Restore such an old Keychip row
 	// in place so an administrator can bind the same physical cabinet again.
 	var deleted model.Terminal
-	if err := database.DB.Unscoped().Where("keychip_id = ?", keychip).First(&deleted).Error; err == nil && deleted.DeletedAt.Valid {
+	lookup := database.DB.Unscoped().Where("keychip_id = ?", keychip).Limit(1).Find(&deleted)
+	if lookup.Error != nil {
+		writeTerminalError(w, http.StatusInternalServerError, "检查 Keychip 失败")
+		return
+	}
+	if lookup.RowsAffected > 0 {
+		if !deleted.DeletedAt.Valid {
+			writeTerminalError(w, http.StatusConflict, "该 Keychip 已被绑定")
+			return
+		}
 		terminal.ID = deleted.ID
 		if err := database.DB.Unscoped().Model(&deleted).Updates(map[string]interface{}{
 			"deleted_at": nil, "name": terminal.Name, "game_id": terminal.GameID,
@@ -67,7 +76,11 @@ func HandleCreateTerminal(w http.ResponseWriter, r *http.Request) {
 			writeTerminalError(w, http.StatusInternalServerError, "恢复机台绑定失败")
 			return
 		}
-		_ = database.DB.First(&terminal, deleted.ID).Error
+		lookup = database.DB.Where("id = ?", deleted.ID).Find(&terminal)
+		if lookup.Error != nil || lookup.RowsAffected == 0 {
+			writeTerminalError(w, http.StatusInternalServerError, "读取恢复后的机台失败")
+			return
+		}
 	} else if err := database.DB.Create(&terminal).Error; err != nil {
 		writeTerminalError(w, http.StatusConflict, "该 Keychip 已被绑定")
 		return
@@ -86,7 +99,7 @@ func HandleUpdateTerminal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var terminal model.Terminal
-	if err := database.DB.First(&terminal, request.ID).Error; err != nil {
+	if lookup := database.DB.Where("id = ?", request.ID).Find(&terminal); lookup.Error != nil || lookup.RowsAffected == 0 {
 		writeTerminalError(w, http.StatusNotFound, "机台不存在")
 		return
 	}

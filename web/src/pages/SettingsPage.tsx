@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import api from '@/lib/api'
+import { PersonalTerminalPanel } from '@/components/PersonalTerminalPanel'
 import type { UserAccount, UserCard } from '@/types'
 import { apiErrorMessage, cardPreview, DEFAULT_CARD_NAME, initialOf, isAccessCodeValid, normalizeAccessCode } from '@/types'
 
@@ -121,6 +122,7 @@ export function SettingsPage({ user, cards, onCardsChanged }: SettingsPageProps)
           </section>
         </CardContent>
       </Card>
+      <PersonalTerminalPanel />
     </div>
   )
 }
