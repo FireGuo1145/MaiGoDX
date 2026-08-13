@@ -107,7 +107,7 @@ func HandleUpsertUserPrint(w http.ResponseWriter, r *http.Request, apiName strin
 
 func cardExpirationDays() int {
 	var config model.SystemConfig
-	if err := database.DB.Where("key = ?", "card_print_expiration_days").First(&config).Error; err != nil {
+	if err := database.DB.Where(&model.SystemConfig{Key: "card_print_expiration_days"}).First(&config).Error; err != nil {
 		return 15
 	}
 	value, err := strconv.Atoi(config.Value)

@@ -1,4 +1,16 @@
-
 # Local server runtime data
-maigodx.db
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
 
+# Local environment configuration
+.env
+.env.*
+!.env.example
+
+# Local Go build outputs
+/maigodx
+/*.exe
+/*.test

@@ -141,7 +141,7 @@ func InitDB() {
 		{Key: "game_max_count_item", Value: "0", Desc: "maimai 道具下发最大数量"},
 	}
 	for _, config := range defaultConfigs {
-		if err := DB.Where("key = ?", config.Key).FirstOrCreate(&config).Error; err != nil {
+		if err := DB.Where(&model.SystemConfig{Key: config.Key}).FirstOrCreate(&config).Error; err != nil {
 			log.Fatalf("Failed to initialize system config %s: %v", config.Key, err)
 		}
 	}

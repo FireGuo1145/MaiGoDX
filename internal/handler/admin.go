@@ -64,7 +64,7 @@ func HandleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var config model.SystemConfig
-	if err := database.DB.Where("key = ?", req.Key).First(&config).Error; err != nil {
+	if err := database.DB.Where(&model.SystemConfig{Key: req.Key}).First(&config).Error; err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": "配置项不存在"})
 		return
@@ -112,11 +112,14 @@ func HandleBindCard(w http.ResponseWriter, r *http.Request) {
 
 	var card model.UserCard
 	if err := database.DB.Where("access_code = ?", req.AccessCode).First(&card).Error; err == nil {
-		if card.UserID != user.ID {
+		// AimeDB may auto-register a card before its owner signs into the portal.
+		// Such records use UserID=0 and may be claimed exactly once here.
+		if card.UserID != 0 && card.UserID != user.ID {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": "该卡片已绑定到其他账户"})
 			return
 		}
+		card.UserID = user.ID
 		card.CardName = cardName
 		if req.GameUserID > 0 {
 			card.GameUserID = req.GameUserID

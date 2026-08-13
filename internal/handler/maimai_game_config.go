@@ -31,7 +31,7 @@ func recommendedMusicPayload(userID int64, configKey, responseKey string) map[st
 // Invalid, duplicate, and non-positive IDs are excluded instead of being sent to cabs.
 func configuredMusicIDs(configKey string) []int {
 	var config model.SystemConfig
-	if err := database.DB.Where("key = ?", configKey).First(&config).Error; err != nil {
+	if err := database.DB.Where(&model.SystemConfig{Key: configKey}).First(&config).Error; err != nil {
 		return []int{}
 	}
 

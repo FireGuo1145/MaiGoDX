@@ -120,7 +120,7 @@ func maimaiCompatibilityPayload(apiName string, userID int64, body []byte) (inte
 
 func maimaiConfigValue(key, fallback string) string {
 	var config model.SystemConfig
-	if err := database.DB.Where("key = ?", key).First(&config).Error; err != nil {
+	if err := database.DB.Where(&model.SystemConfig{Key: key}).First(&config).Error; err != nil {
 		return fallback
 	}
 	return strings.TrimSpace(config.Value)

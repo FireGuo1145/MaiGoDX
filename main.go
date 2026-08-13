@@ -19,6 +19,8 @@ var distFS embed.FS
 func main() {
 	// 初始化数据库与持久化层
 	database.InitDB()
+	// AimeDB is a separate TCP daemon used by SDGA after successful PowerOn.
+	go handler.StartAimeDB()
 
 	mux := http.NewServeMux()
 

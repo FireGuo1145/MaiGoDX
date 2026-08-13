@@ -26,7 +26,7 @@ func resolveMaimaiAPI(rawAPI, requestPath string) string {
 		return strings.TrimSuffix(rawAPI, "Api")
 	}
 	var config model.SystemConfig
-	if err := database.DB.Where("key = ?", "maimai_endpoint_salts").First(&config).Error; err != nil || strings.TrimSpace(config.Value) == "" {
+	if err := database.DB.Where(&model.SystemConfig{Key: "maimai_endpoint_salts"}).First(&config).Error; err != nil || strings.TrimSpace(config.Value) == "" {
 		return rawAPI
 	}
 	suffix := ""
