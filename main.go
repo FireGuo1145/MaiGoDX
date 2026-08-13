@@ -21,6 +21,11 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	// 注册认证 API 路由
+	mux.HandleFunc("/api/auth/register", handler.HandleRegister)
+	mux.HandleFunc("/api/auth/login", handler.HandleLogin)
+	mux.HandleFunc("/api/auth/verify", handler.HandleVerifyEmail)
+
 	// 托管前端静态资源
 	subFS, err := fs.Sub(distFS, "web/dist")
 	if err != nil {
@@ -30,9 +35,11 @@ func main() {
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		// 如果是 maimai API 请求
-		if strings.HasPrefix(path, "/g/") {
-			handler.MaimaiHandler(w, r)
+		// 如果是 maimai API 请求或认证 API 请求
+		if strings.HasPrefix(path, "/g/") || strings.HasPrefix(path, "/api/") {
+			if strings.HasPrefix(path, "/g/") {
+				handler.MaimaiHandler(w, r)
+			}
 			return
 		}
 
