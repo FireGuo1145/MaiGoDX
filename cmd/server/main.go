@@ -4,11 +4,15 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/FireGuo1145/MaiGoDX/internal/database"
 	"github.com/FireGuo1145/MaiGoDX/internal/handler"
 	"github.com/FireGuo1145/MaiGoDX/internal/middleware"
 )
 
 func main() {
+	// 初始化 SQLite 数据库与持久化层
+	database.InitDB()
+
 	mux := http.NewServeMux()
 
 	// 注册路由，兼容 SDGA (国际版) 与 SDEZ (日版) 的 maimai2 路由
