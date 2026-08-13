@@ -13,7 +13,7 @@ import (
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
 )
 
-// MaimaiHandler 处理所有 /Maimai2Servlet/ 下的请求，完全对齐 AquaDX 路由与分发逻辑
+// MaimaiHandler 处理所有 /Maimai2Servlet/ 下的请求
 func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	parts := strings.Split(path, "/")
@@ -22,7 +22,6 @@ func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 		apiName = parts[len(parts)-1]
 	}
 
-	// 如果 apiName 是 32 位 MD5 哈希（ALL.Net 加密端点），支持识别
 	if len(apiName) == 32 {
 		log.Printf("[MaiGoDX] Encrypted endpoint hash detected: %s", apiName)
 	}
@@ -132,7 +131,6 @@ func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 		return
 
 	default:
-		// 校验是否可以通过 MD5 反查或直接返回通用成功
 		resp := model.Response{
 			ReturnCode: 1,
 			ApiName:    "com.sega.maimai2servlet.api." + apiName,
@@ -150,7 +148,28 @@ func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-// ComputeEndpointHash 模拟 AquaDX 的 MD5 端点加密校验
+// HandleGetStats 提供给前端展示的统计数据
+func HandleGetStats(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	var totalUsers int64
+	database.DB.Model(&model.UserAccount{}).Count(&totalUsers)
+
+	var totalPlays int64
+	database.DB.Model(&model.UserPlaylog{}).Count(&totalPlays)
+
+	var recentPlays []model.UserPlaylog
+	database.DB.Order("id desc").Limit(10).Find(&recentPlays)
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":     true,
+		"totalUsers":  totalUsers,
+		"totalPlays":  totalPlays,
+		"recentPlays": recentPlays,
+	})
+}
+
+// ComputeEndpointHash 模拟 MD5 哈希
 func ComputeEndpointHash(endpoint string, salt string) string {
 	hasher := md5.New()
 	hasher.Write([]byte(endpoint + salt))

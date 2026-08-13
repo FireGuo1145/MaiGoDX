@@ -16,7 +16,7 @@ import (
 var distFS embed.FS
 
 func main() {
-	// 初始化数据库与持久化层（含默认管理员自动创建）
+	// 初始化数据库与持久化层
 	database.InitDB()
 
 	mux := http.NewServeMux()
@@ -26,6 +26,7 @@ func main() {
 	mux.HandleFunc("/api/auth/login", handler.HandleLogin)
 	mux.HandleFunc("/api/auth/verify", handler.HandleVerifyEmail)
 	mux.HandleFunc("/api/admin/users", handler.HandleAdminUsers)
+	mux.HandleFunc("/api/stats", handler.HandleGetStats)
 
 	// 托管前端静态资源
 	subFS, err := fs.Sub(distFS, "web/dist")
@@ -36,7 +37,6 @@ func main() {
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		// 如果是 maimai API 请求或认证/管理 API 请求
 		if strings.HasPrefix(path, "/g/") || strings.HasPrefix(path, "/api/") {
 			if strings.HasPrefix(path, "/g/") {
 				handler.MaimaiHandler(w, r)
@@ -44,7 +44,6 @@ func main() {
 			return
 		}
 
-		// 检查静态资源是否存在，若不存在则 fallback 到 index.html (SPA 支持)
 		cleanPath := strings.TrimPrefix(path, "/")
 		if cleanPath == "" {
 			cleanPath = "index.html"
