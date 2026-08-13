@@ -51,15 +51,16 @@ func HandleGetStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var card model.UserCard
-	if err := database.DB.Where("user_id = ? AND game_user_id > 0", account.ID).Order("id asc").First(&card).Error; err != nil {
-		response["message"] = "no game profile is associated with this account"
+	cardLookup := database.DB.Where("user_id = ? AND game_user_id > 0", account.ID).Order("id asc").Limit(1).Find(&card)
+	if cardLookup.Error != nil || cardLookup.RowsAffected == 0 {
+		response["message"] = "当前账户尚未关联 maimai 游戏档案"
 		_ = json.NewEncoder(w).Encode(response)
 		return
 	}
-
 	var detail model.UserDetail
-	if err := database.DB.Where("user_id = ?", card.GameUserID).First(&detail).Error; err != nil {
-		response["message"] = "the bound card has no maimai profile yet"
+	detailLookup := database.DB.Where("user_id = ?", card.GameUserID).Limit(1).Find(&detail)
+	if detailLookup.Error != nil || detailLookup.RowsAffected == 0 {
+		response["message"] = "已关联的卡片尚未创建 maimai 游戏档案"
 		_ = json.NewEncoder(w).Encode(response)
 		return
 	}

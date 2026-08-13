@@ -36,7 +36,8 @@ func currentAccount(r *http.Request) (*model.UserAccount, bool) {
 		return nil, false
 	}
 	var account model.UserAccount
-	if err := database.DB.Where("session_token = ? AND session_expires_at > ?", cookie.Value, time.Now()).First(&account).Error; err != nil {
+	lookup := database.DB.Where("session_token = ? AND session_expires_at > ?", cookie.Value, time.Now()).Limit(1).Find(&account)
+	if lookup.Error != nil || lookup.RowsAffected == 0 {
 		return nil, false
 	}
 	return &account, true
