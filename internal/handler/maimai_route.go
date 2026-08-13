@@ -18,7 +18,7 @@ var maimaiAPINames = []string{
 	"GetUserOptionApi", "GetUserPortraitApi", "GetUserPreviewApi", "GetUserRatingApi", "GetUserRecommendRateMusicApi", "GetUserRecommendSelectMusicApi", "GetUserRegionApi", "GetUserRivalDataApi", "GetUserRivalMusicApi", "GetUserScoreRankingApi", "GetUserShopStockApi",
 	"UploadUserPhotoApi", "UploadUserPlaylogApi", "UploadUserPlaylogListApi", "UploadUserPortraitApi", "UpsertUserAllApi", "UpsertUserChargelogApi",
 	"UpsertUserPlaceCircleRegistApi", "UpsertUserPrintApi", "UpsertClientBookkeepingApi", "UpsertClientPlayTimeApi", "UpsertClientSettingApi", "UpsertClientTestmodeApi", "UpsertClientUploadApi",
-	"CMGetSellingCardApi", "CMGetUserCharacterApi", "CMGetUserDataApi", "CMGetUserItemApi", "CMGetUserPreviewApi", "CMLoginApi", "CMLogoutApi", "CMUpsertBuyCardApi", "CMUpsertUserPrintApi", "CMUpsertUserPrintlogApi", "CreateTokenApi", "GetTransferFriendApi", "Ping", "RemoveTokenApi", "UserFriendRegistApi", "UserLoginApi", "UserLogoutApi",
+	"CMGetSellingCardApi", "CMGetUserCardApi", "CMGetUserCardPrintErrorApi", "CMGetUserCharacterApi", "CMGetUserDataApi", "CMGetUserItemApi", "CMGetUserPreviewApi", "CMLoginApi", "CMLogoutApi", "CMUpsertBuyCardApi", "CMUpsertUserPrintApi", "CMUpsertUserPrintlogApi", "CreateTokenApi", "GetTransferFriendApi", "Ping", "RemoveTokenApi", "UserFriendRegistApi", "UserLoginApi", "UserLogoutApi",
 }
 
 func resolveMaimaiAPI(rawAPI, requestPath string) string {

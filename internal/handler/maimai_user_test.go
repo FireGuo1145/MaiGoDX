@@ -317,3 +317,24 @@ func TestPhotoAndPortraitChunkEndpointsMatchAquaDX(t *testing.T) {
 		t.Fatalf("portrait chunk=%v", entry)
 	}
 }
+
+func TestGetUserCardAndCMGetUserCardReturnPersistedCards(t *testing.T) {
+	setupMaimaiTestDB(t)
+	if err := database.DB.Create(&model.UserGameCard{UserID: 73, CardID: 4, CardTypeID: 2, CharaID: 7}).Error; err != nil {
+		t.Fatalf("create game card: %v", err)
+	}
+	for _, api := range []string{"GetUserCardApi", "CMGetUserCardApi"} {
+		t.Run(api, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/"+api, strings.NewReader(`{"userId":73}`))
+			res := httptest.NewRecorder()
+			MaimaiHandler(res, req)
+			var cards []map[string]interface{}
+			if err := json.Unmarshal(res.Body.Bytes(), &cards); err != nil {
+				t.Fatalf("decode card list: %v body=%s", err, res.Body.String())
+			}
+			if len(cards) != 1 || cards[0]["cardId"] != float64(4) {
+				t.Fatalf("unexpected card list: %v", cards)
+			}
+		})
+	}
+}

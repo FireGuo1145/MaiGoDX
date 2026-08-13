@@ -172,7 +172,7 @@ func loadRateData(userID int64, key string) []model.UserRate {
 
 func isStaticMaimaiAPI(apiName string) bool {
 	switch apiName {
-	case "CreateToken", "CMGetSellingCard", "CMUpsertUserPrintlog", "GetGameSetting", "GetGameEvent", "GetGameCharge", "GetGameFesta", "GetGameKaleidxScope", "GetGameMusicScore", "GetGameNationalData", "GetGameNgMusicId", "GetGameTournamentInfo", "GetGameWeeklyData", "GetGameMapAreaCondition", "GetPlaceCircleData", "GetUserCardPrintError", "GetUserCircleData", "GetUserCirclePointRanking", "GetUserFesta", "GetUserFriendCheck", "GetUserScoreRanking", "Ping", "RemoveToken", "UserFriendRegist", "UserLogout", "CMLogin", "CMLogout", "CMUpsertBuyCard", "UpsertClientBookkeeping", "UpsertClientPlayTime", "UpsertClientSetting", "UpsertClientTestmode", "UpsertClientUpload", "UpsertUserChargelog", "UpsertUserPlaceCircleRegist":
+	case "CreateToken", "CMGetSellingCard", "CMUpsertUserPrintlog", "GetGameSetting", "GetGameEvent", "GetGameCharge", "GetGameFesta", "GetGameKaleidxScope", "GetGameMusicScore", "GetGameNationalData", "GetGameNgMusicId", "GetGameTournamentInfo", "GetGameWeeklyData", "GetGameMapAreaCondition", "GetPlaceCircleData", "GetUserCardPrintError", "CMGetUserCardPrintError", "GetUserCircleData", "GetUserCirclePointRanking", "GetUserFesta", "GetUserFriendCheck", "GetUserScoreRanking", "Ping", "RemoveToken", "UserFriendRegist", "UserLogout", "CMLogin", "CMLogout", "CMUpsertBuyCard", "UpsertClientBookkeeping", "UpsertClientPlayTime", "UpsertClientSetting", "UpsertClientTestmode", "UpsertClientUpload", "UpsertUserChargelog", "UpsertUserPlaceCircleRegist":
 		return true
 	default:
 		return false

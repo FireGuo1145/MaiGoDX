@@ -186,9 +186,13 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 		return recommendedMusicPayload(userID, "maimai_recommend_rate_music_ids", "userRecommendRateMusicIdList"), true, nil
 	case "GetUserRecommendSelectMusic":
 		return recommendedMusicPayload(userID, "maimai_recommend_select_music_ids", "userRecommendSelectionMusicIdList"), true, nil
-	case "GetUserGhost", "GetUserCard", "GetUserCharge", "GetUserFriendSeasonRanking", "GetUserFavoriteItem", "GetUserNewItemList":
+	case "GetUserCard", "CMGetUserCard":
+		var cards []model.UserGameCard
+		database.DB.Where("user_id = ?", userID).Order("card_id asc").Find(&cards)
+		return cards, true, nil
+	case "GetUserGhost", "GetUserCharge", "GetUserFriendSeasonRanking", "GetUserFavoriteItem":
 		return []interface{}{}, true, nil
-	case "GetUserCardPrintError":
+	case "GetUserCardPrintError", "CMGetUserCardPrintError":
 		return map[string]interface{}{"length": 0, "userPrintDetailList": []interface{}{}}, true, nil
 	case "GetGameNgMusicId":
 		return map[string]interface{}{"length": 0, "musicIdList": []interface{}{}, "ngMusicDataList": []interface{}{}}, true, nil
