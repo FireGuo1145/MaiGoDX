@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -22,44 +23,55 @@ const terminalSessionTTL = 48 * time.Hour
 func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
+		log.Printf("[MaiGoDX] ALL.Net PowerOn rejected: cannot read request body: %v", err)
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
 	request, err := decodeAllNet(payload)
 	if err != nil {
+		log.Printf("[MaiGoDX] ALL.Net PowerOn rejected: invalid DFI payload (bytes=%d): %v", len(payload), err)
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
-
-	keychip := strings.TrimSpace(request["serial"])
-	gameID := strings.TrimSpace(request["game_id"])
+	keychip := normalizeKeychip(request["serial"])
+	gameID := strings.ToUpper(strings.TrimSpace(request["game_id"]))
 	version := strings.TrimSpace(request["ver"])
 	if keychip == "" || gameID == "" {
-		http.Error(w, "", http.StatusForbidden)
+		terminalReject(w, r, "PowerOn", "missing serial or game_id")
 		return
 	}
-
 	terminal, err := findTerminalByKeychip(keychip)
-	if err != nil || !terminal.IsEnabled {
-		http.Error(w, "", http.StatusForbidden)
-		return
-	}
-	if terminal.GameID != "" && !strings.EqualFold(terminal.GameID, gameID) {
-		http.Error(w, "", http.StatusForbidden)
-		return
-	}
-
-	terminal.GameVersion = version
-	terminal.LastSeenAt = time.Now()
-	terminal.LastSeenIP = clientIP(r)
-	_ = database.DB.Save(&terminal).Error
-
-	token, err := createTerminalSession(&terminal, gameID)
 	if err != nil {
+		log.Printf("[MaiGoDX] ALL.Net PowerOn database error: keychip=%s game=%s error=%v", keychip, gameID, err)
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
-
+	if terminal.ID == 0 {
+		terminalReject(w, r, "PowerOn", "keychip is not registered: "+keychip)
+		return
+	}
+	if !terminal.IsEnabled {
+		terminalReject(w, r, "PowerOn", "keychip is disabled: "+terminal.KeychipID)
+		return
+	}
+	// AquaDX authenticates a Keychip independently from the requested game ID.
+	// Keep the configured game ID for portal display, but do not reject a valid
+	// authenticated Keychip merely because the cabinet reports another game code.
+	if terminal.GameID != "" && !strings.EqualFold(terminal.GameID, gameID) {
+		log.Printf("[MaiGoDX] ALL.Net PowerOn compatibility: keychip=%s configured_game=%s requested_game=%s; accepting authenticated session", terminal.KeychipID, terminal.GameID, gameID)
+	}
+	terminal.GameVersion = version
+	terminal.LastSeenAt = time.Now()
+	terminal.LastSeenIP = clientIP(r)
+	if err := database.DB.Save(&terminal).Error; err != nil {
+		log.Printf("[MaiGoDX] ALL.Net PowerOn warning: failed to update terminal %d: %v", terminal.ID, err)
+	}
+	token, err := createTerminalSession(&terminal, gameID)
+	if err != nil {
+		log.Printf("[MaiGoDX] ALL.Net PowerOn session creation failed: keychip=%s error=%v", terminal.KeychipID, err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
 	base := forwardedHost(r)
 	uri := "http://" + base + "/gs/" + token + "/" + gameID + "/" + version + "/"
 	response := map[string]string{
@@ -83,12 +95,13 @@ func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 		response["timezone"] = "+09:00"
 		response["res_class"] = "PowerOnResponseV2"
 	}
-
 	encoded, err := encodeAllNet(response)
 	if err != nil {
+		log.Printf("[MaiGoDX] ALL.Net PowerOn response encoding failed: %v", err)
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("[MaiGoDX] ALL.Net PowerOn accepted: keychip=%s terminal=%d game=%s version=%s session=%s remote=%s", terminal.KeychipID, terminal.ID, gameID, version, compactTerminalToken(token), clientIP(r))
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Pragma", "DFI")
 	_, _ = w.Write(encoded)
@@ -97,23 +110,26 @@ func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 // HandleTerminalMaimai verifies the PowerOn session before dispatching game APIs.
 func HandleTerminalMaimai(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	// AquaDX's interceptor accepts every /gs/{token}/... request shape, checks
-	// only the token, then rewrites it to /g/... for the game controller.
 	if len(parts) < 2 || parts[0] != "gs" || strings.TrimSpace(parts[1]) == "" {
-		http.Error(w, "", http.StatusForbidden)
+		terminalReject(w, r, "SecureGame", "malformed protected path")
 		return
 	}
-
+	token := parts[1]
 	var session model.TerminalSession
-	lookup := database.DB.Where("token = ? AND expires_at > ?", parts[1], time.Now()).Limit(1).Find(&session)
-	if lookup.Error != nil || lookup.RowsAffected == 0 {
-		http.Error(w, "", http.StatusForbidden)
+	lookup := database.DB.Where("token = ? AND expires_at > ?", token, time.Now()).Limit(1).Find(&session)
+	if lookup.Error != nil {
+		log.Printf("[MaiGoDX] ALL.Net SecureGame database error: path=%s session=%s error=%v", r.URL.Path, compactTerminalToken(token), lookup.Error)
+		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
-	// Match AquaDX's KeychipSessionService.find(): every successful game request
-	// refreshes the idle expiry rather than imposing a fixed PowerOn lifetime.
+	if lookup.RowsAffected == 0 {
+		terminalReject(w, r, "SecureGame", "session token does not exist or has expired: "+compactTerminalToken(token))
+		return
+	}
 	session.ExpiresAt = time.Now().Add(terminalSessionTTL)
-	_ = database.DB.Save(&session).Error
+	if err := database.DB.Save(&session).Error; err != nil {
+		log.Printf("[MaiGoDX] ALL.Net SecureGame warning: failed to renew session=%s: %v", compactTerminalToken(token), err)
+	}
 	MaimaiHandler(w, r)
 }
 
@@ -170,6 +186,18 @@ func forwardedHost(r *http.Request) string {
 		return forwarded
 	}
 	return r.Host
+}
+
+func terminalReject(w http.ResponseWriter, r *http.Request, stage, reason string) {
+	log.Printf("[MaiGoDX] ALL.Net %s rejected: %s | method=%s path=%s remote=%s", stage, reason, r.Method, r.URL.Path, clientIP(r))
+	http.Error(w, "", http.StatusForbidden)
+}
+
+func compactTerminalToken(token string) string {
+	if len(token) <= 8 {
+		return token
+	}
+	return token[:8] + "..."
 }
 
 func decodeAllNet(source []byte) (map[string]string, error) {
