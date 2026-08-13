@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -22,17 +23,25 @@ func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
+	// 读取请求体（支持解析复杂的 JSON 请求，如 UpsertUserAll）
+	var reqBodyMap map[string]interface{}
+	if r.Method == http.MethodPost {
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err == nil && len(bodyBytes) > 0 {
+			_ = json.Unmarshal(bodyBytes, &reqBodyMap)
+		}
+	}
+
 	var responseData interface{}
 	switch apiName {
 	case "GetUserPreview":
-		responseData = model.UserPreviewData{
+		responseData = model.UserDetail{
 			UserID:   114514,
 			UserName: "杂鱼大哥哥",
-			IsLogin:  true,
-			LastData: "2026-08-13 12:00:00",
+			Rating:   15000,
 		}
 	case "GetUserData":
-		responseData = model.UserDetailData{
+		responseData = model.UserDetail{
 			UserID:            114514,
 			UserName:          "杂鱼大哥哥",
 			EquipGlassesID:    1,
@@ -45,6 +54,8 @@ func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 			TotalPoint:        999999,
 		}
 	case "UpsertUserAll":
+		// 解析全量上传数据结构
+		log.Printf("[MaiGoDX] Processing UpsertUserAll for user...")
 		resp := model.Response{
 			ReturnCode: 1,
 			ApiName:    "com.sega.maimai2servlet.api." + apiName,
