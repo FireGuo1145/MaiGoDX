@@ -16,15 +16,16 @@ import (
 var distFS embed.FS
 
 func main() {
-	// 初始化 SQLite 数据库与持久化层
+	// 初始化数据库与持久化层（含默认管理员自动创建）
 	database.InitDB()
 
 	mux := http.NewServeMux()
 
-	// 注册认证 API 路由
+	// 注册认证与管理 API 路由
 	mux.HandleFunc("/api/auth/register", handler.HandleRegister)
 	mux.HandleFunc("/api/auth/login", handler.HandleLogin)
 	mux.HandleFunc("/api/auth/verify", handler.HandleVerifyEmail)
+	mux.HandleFunc("/api/admin/users", handler.HandleAdminUsers)
 
 	// 托管前端静态资源
 	subFS, err := fs.Sub(distFS, "web/dist")
@@ -35,7 +36,7 @@ func main() {
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		// 如果是 maimai API 请求或认证 API 请求
+		// 如果是 maimai API 请求或认证/管理 API 请求
 		if strings.HasPrefix(path, "/g/") || strings.HasPrefix(path, "/api/") {
 			if strings.HasPrefix(path, "/g/") {
 				handler.MaimaiHandler(w, r)

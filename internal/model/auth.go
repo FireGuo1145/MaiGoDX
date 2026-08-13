@@ -10,6 +10,7 @@ type UserAccount struct {
 	Username     string `json:"username"`
 	IsVerified   bool   `gorm:"default:false" json:"isVerified"`
 	VerifyToken  string `json:"verifyToken"`
+	IsAdmin      bool   `gorm:"default:false" json:"isAdmin"`
 }
 
 // RegisterRequest 注册请求体

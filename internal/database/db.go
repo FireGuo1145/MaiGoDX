@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -13,7 +14,7 @@ import (
 
 var DB *gorm.DB
 
-// InitDB 根据环境变量 DB_TYPE 和 DB_DSN 初始化数据库连接（默认 SQLite）
+// InitDB 根据环境变量 DB_TYPE 和 DB_DSN 初始化数据库连接（默认 SQLite），并自动初始化默认管理员
 func InitDB() {
 	dbType := os.Getenv("DB_TYPE")
 	dbDSN := os.Getenv("DB_DSN")
@@ -64,6 +65,22 @@ func InitDB() {
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto migrate database: %v", err)
+	}
+
+	// 系统初始化：检查是否存在管理员，若无则自动创建默认管理员
+	var adminCount int64
+	DB.Model(&model.UserAccount{}).Where("is_admin = ?", true).Count(&adminCount)
+	if adminCount == 0 {
+		hashedPass, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+		admin := model.UserAccount{
+			Email:        "admin@maigodx.local",
+			PasswordHash: string(hashedPass),
+			Username:     "SystemAdmin",
+			IsVerified:   true,
+			IsAdmin:      true,
+		}
+		DB.Create(&admin)
+		log.Println("[MaiGoDX] Default administrator created: admin@maigodx.local / admin123")
 	}
 
 	log.Printf("[MaiGoDX] Database initialized successfully using driver: %s", dbType)
