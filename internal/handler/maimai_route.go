@@ -10,15 +10,15 @@ import (
 )
 
 var maimaiAPINames = []string{
-	"GetGameChargeApi", "GetGameEventApi", "GetGameRankingApi", "GetGameSettingApi",
-	"GetUserActivityApi", "GetUserCardApi", "GetUserCardPrintErrorApi", "GetUserCharacterApi",
-	"GetUserCourseApi", "GetUserDataApi", "GetUserExtendApi", "GetUserFavoriteApi",
-	"GetUserFavoriteItemApi", "GetUserGhostApi", "GetUserIntimateApi", "GetUserItemApi",
-	"GetUserKaleidxScopeApi", "GetUserLoginBonusApi", "GetUserMapApi", "GetUserMusicApi",
-	"GetUserOptionApi", "GetUserPreviewApi", "GetUserRatingApi", "GetUserRecommendRateMusicApi", "GetUserRecommendSelectMusicApi",
-	"UploadUserPhotoApi", "UploadUserPlaylogApi", "UploadUserPlaylogListApi", "UpsertUserAllApi",
-	"UpsertUserPrintApi", "CMGetUserCharacterApi", "CMGetUserDataApi", "CMGetUserItemApi",
-	"CMGetUserPreviewApi", "CMUpsertUserPrintApi", "Ping", "RemoveTokenApi", "UserLoginApi", "UserLogoutApi",
+	"GetGameChargeApi", "GetGameEventApi", "GetGameFestaApi", "GetGameMusicScoreApi", "GetGameNgMusicIdApi", "GetGameRankingApi", "GetGameSettingApi", "GetGameWeeklyDataApi", "GetGameMapAreaConditionApi",
+	"GetPlaceCircleDataApi", "GetUserActivityApi", "GetUserCardApi", "GetUserCardPrintErrorApi", "GetUserCharacterApi",
+	"GetUserCircleChallengeApi", "GetUserCircleDataApi", "GetUserCirclePointDataApi", "GetUserCirclePointRankingApi", "GetUserCourseApi", "GetUserDataApi", "GetUserExtendApi", "GetUserFavoriteApi",
+	"GetUserFavoriteItemApi", "GetUserFestaApi", "GetUserGhostApi", "GetUserIntimateApi", "GetUserItemApi",
+	"GetUserKaleidxScopeApi", "GetUserLoginBonusApi", "GetUserMapApi", "GetUserMissionDataApi", "GetUserMusicApi",
+	"GetUserOptionApi", "GetUserPreviewApi", "GetUserRatingApi", "GetUserRecommendRateMusicApi", "GetUserRecommendSelectMusicApi", "GetUserScoreRankingApi",
+	"UploadUserPhotoApi", "UploadUserPlaylogApi", "UploadUserPlaylogListApi", "UpsertUserAllApi", "UpsertUserChargelogApi",
+	"UpsertUserPlaceCircleRegistApi", "UpsertUserPrintApi", "UpsertClientBookkeepingApi", "UpsertClientPlayTimeApi", "UpsertClientSettingApi", "UpsertClientTestmodeApi", "UpsertClientUploadApi",
+	"CMGetUserCharacterApi", "CMGetUserDataApi", "CMGetUserItemApi", "CMGetUserPreviewApi", "CMLoginApi", "CMLogoutApi", "CMUpsertBuyCardApi", "CMUpsertUserPrintApi", "Ping", "RemoveTokenApi", "UserLoginApi", "UserLogoutApi",
 }
 
 func resolveMaimaiAPI(rawAPI, requestPath string) string {

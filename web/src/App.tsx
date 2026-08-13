@@ -9,7 +9,7 @@ import { HomePage } from '@/pages/HomePage'
 import { MaimaiPage } from '@/pages/MaimaiPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { SetupPage } from '@/pages/SetupPage'
-import type { LoginResult, PageId, Stats, SystemConfig, Terminal, UserAccount, UserCard } from '@/types'
+import type { GameCharge, GameEvent, LoginResult, PageId, Stats, SystemConfig, Terminal, UserAccount, UserCard } from '@/types'
 import { apiErrorMessage } from '@/types'
 
 const pagePaths: Record<PageId, string> = {
@@ -45,6 +45,8 @@ export default function App() {
   const [users, setUsers] = useState<UserAccount[]>([])
   const [configs, setConfigs] = useState<SystemConfig[]>([])
   const [terminals, setTerminals] = useState<Terminal[]>([])
+  const [events, setEvents] = useState<GameEvent[]>([])
+  const [charges, setCharges] = useState<GameCharge[]>([])
   const location = useLocation()
   const navigate = useNavigate()
   const page = pageFromPath(location.pathname)
@@ -100,6 +102,22 @@ export default function App() {
     }
   }
 
+  const refreshEvents = async () => {
+    try {
+      const result = await api.getGameEvents()
+      if (result.success) setEvents(result.events || [])
+    } catch (error) {
+      console.error('加载游戏事件失败：', apiErrorMessage(error))
+    }
+  }
+  const refreshCharges = async () => {
+    try {
+      const result = await api.getGameCharges()
+      if (result.success) setCharges(result.charges || [])
+    } catch (error) {
+      console.error('加载收费项目失败：', apiErrorMessage(error))
+    }
+  }
   const refreshConfigs = async () => {
     try {
       const result = await api.getConfigs()
@@ -117,6 +135,8 @@ export default function App() {
       void refreshUsers()
       void refreshConfigs()
       void refreshTerminals()
+      void refreshEvents()
+      void refreshCharges()
     }
   }, [user])
 
@@ -128,6 +148,8 @@ export default function App() {
     setUsers([])
     setConfigs([])
     setTerminals([])
+    setEvents([])
+    setCharges([])
     navigate('/', { replace: true })
   }
 
@@ -157,7 +179,7 @@ export default function App() {
         <Route
           path="/admin"
           element={user.isAdmin
-            ? <AdminPage users={users} configs={configs} terminals={terminals} onUsersChanged={refreshUsers} onConfigsChanged={refreshConfigs} onTerminalsChanged={refreshTerminals} />
+            ? <AdminPage users={users} configs={configs} terminals={terminals} events={events} charges={charges} onUsersChanged={refreshUsers} onConfigsChanged={refreshConfigs} onTerminalsChanged={refreshTerminals} onEventsChanged={refreshEvents} onChargesChanged={refreshCharges} />
             : <Navigate to="/" replace />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />

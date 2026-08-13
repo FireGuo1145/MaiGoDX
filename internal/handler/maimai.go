@@ -60,6 +60,10 @@ func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if isStaticMaimaiAPI(apiName) {
+		if apiName == "UpsertUserPlaceCircleRegist" {
+			writeGameResponse(w, apiName, 0, nil, "")
+			return
+		}
 		if data, handled, err := maimaiReadPayload(apiName, 0, body); handled {
 			if err != nil {
 				writeGameResponse(w, apiName, 0, nil, err.Error())
@@ -159,7 +163,7 @@ func loadRateData(userID int64, key string) []model.UserRate {
 
 func isStaticMaimaiAPI(apiName string) bool {
 	switch apiName {
-	case "GetGameSetting", "GetGameEvent", "GetGameCharge", "GetGameNgMusicId", "GetUserCardPrintError", "Ping", "RemoveToken", "UserLogout", "CMLogin", "CMLogout":
+	case "GetGameSetting", "GetGameEvent", "GetGameCharge", "GetGameFesta", "GetGameMusicScore", "GetGameNgMusicId", "GetGameWeeklyData", "GetGameMapAreaCondition", "GetPlaceCircleData", "GetUserCardPrintError", "GetUserCircleData", "GetUserCirclePointRanking", "GetUserFesta", "GetUserScoreRanking", "Ping", "RemoveToken", "UserLogout", "CMLogin", "CMLogout", "CMUpsertBuyCard", "UpsertClientBookkeeping", "UpsertClientPlayTime", "UpsertClientSetting", "UpsertClientTestmode", "UpsertClientUpload", "UpsertUserChargelog", "UpsertUserPlaceCircleRegist":
 		return true
 	default:
 		return false

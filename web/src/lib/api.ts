@@ -11,6 +11,10 @@ import {
   type UsersResult,
   type Terminal,
   type TerminalsResult,
+  type GameEvent,
+  type GameCharge,
+  type EventsResult,
+  type ChargesResult,
 } from '@/types'
 
 export const api = {
@@ -29,6 +33,14 @@ export const api = {
   createTerminal: (terminal: Pick<Terminal, "keychipId" | "name" | "gameId" | "gameVersion">) => postJson<ApiResult>(API_PATHS.createTerminal, terminal),
   updateTerminal: (terminal: Terminal) => postJson<ApiResult>(API_PATHS.updateTerminal, terminal),
   deleteTerminal: (id: number) => postJson<ApiResult>(API_PATHS.deleteTerminal, { id }),
+  getGameEvents: () => getJson<EventsResult>(API_PATHS.events),
+  createGameEvent: (event: Omit<GameEvent, 'ID'>) => postJson<ApiResult>(API_PATHS.createEvent, event),
+  updateGameEvent: (event: GameEvent) => postJson<ApiResult>(API_PATHS.updateEvent, event),
+  deleteGameEvent: (id: number) => postJson<ApiResult>(API_PATHS.deleteEvent, { id }),
+  getGameCharges: () => getJson<ChargesResult>(API_PATHS.charges),
+  createGameCharge: (charge: GameCharge) => postJson<ApiResult>(API_PATHS.createCharge, charge),
+  updateGameCharge: (charge: GameCharge) => postJson<ApiResult>(API_PATHS.updateCharge, charge),
+  deleteGameCharge: (chargeId: number) => postJson<ApiResult>(API_PATHS.deleteCharge, { chargeId }),
   getConfigs: () => getJson<ConfigsResult>(API_PATHS.configs),
   updateConfig: (key: string, value: string) => postJson<ApiResult>(API_PATHS.updateConfig, { key, value }),
 }

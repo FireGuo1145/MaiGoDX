@@ -12,6 +12,9 @@ import (
 )
 
 func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, bool, error) {
+	if payload, handled := maimaiCompatibilityPayload(apiName, userID, body); handled {
+		return payload, true, nil
+	}
 	var detail model.UserDetail
 	loadProfile := func() error {
 		if err := database.DB.Where("user_id = ?", userID).First(&detail).Error; err != nil {

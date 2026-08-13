@@ -6,17 +6,22 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import api from '@/lib/api'
-import type { SystemConfig, Terminal, UserAccount } from '@/types'
+import type { GameCharge, GameEvent, SystemConfig, Terminal, UserAccount } from '@/types'
 import { TerminalPanel } from '@/components/admin/TerminalPanel'
+import { GameDataPanel } from '@/components/admin/GameDataPanel'
 import { apiErrorMessage, initialOf, isTruthyConfig } from '@/types'
 
 interface AdminPageProps {
   users: UserAccount[]
   configs: SystemConfig[]
   terminals: Terminal[]
+  events: GameEvent[]
+  charges: GameCharge[]
   onUsersChanged: () => Promise<void>
   onConfigsChanged: () => Promise<void>
   onTerminalsChanged: () => Promise<void>
+  onEventsChanged: () => Promise<void>
+  onChargesChanged: () => Promise<void>
 }
 
 function ConfigRow({ config, onSaved }: { config: SystemConfig; onSaved: () => Promise<void> }) {
@@ -58,12 +63,12 @@ function ConfigRow({ config, onSaved }: { config: SystemConfig; onSaved: () => P
   )
 }
 
-export function AdminPage({ users, configs, terminals, onUsersChanged, onConfigsChanged, onTerminalsChanged }: AdminPageProps) {
+export function AdminPage({ users, configs, terminals, events, charges, onUsersChanged, onConfigsChanged, onTerminalsChanged, onEventsChanged, onChargesChanged }: AdminPageProps) {
   return (
     <div className="space-y-8">
       <section className="space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold flex items-center gap-2"><Users /> User Management</h2>
+          <h2 className="text-xl font-bold flex items-center gap-2"><Users /> 用户管理</h2>
           <Button type="button" onClick={onUsersChanged} size="sm" variant="outline" className="border-slate-700">刷新列表</Button>
         </div>
         <Card className="bg-slate-900 border-slate-800 overflow-hidden">
@@ -92,9 +97,10 @@ export function AdminPage({ users, configs, terminals, onUsersChanged, onConfigs
       </section>
 
       <TerminalPanel terminals={terminals} onChanged={onTerminalsChanged} />
+      <GameDataPanel events={events} charges={charges} onEventsChanged={onEventsChanged} onChargesChanged={onChargesChanged} />
       <section className="space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold flex items-center gap-2"><Sliders /> Server Configuration Management</h2>
+          <h2 className="text-xl font-bold flex items-center gap-2"><Sliders /> 服务器配置管理</h2>
           <Button type="button" onClick={onConfigsChanged} size="sm" variant="outline" className="border-slate-700">刷新配置</Button>
         </div>
         <Card className="bg-slate-900 border-slate-800">

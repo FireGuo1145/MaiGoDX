@@ -35,7 +35,20 @@ export interface Terminal {
   lastSeenIp: string
 }
 
-export interface Playlog {
+export interface GameEvent {
+  ID: number
+  type: number
+  startDate: string
+  endDate: string
+  disableArea: string
+}
+export interface GameCharge {
+  chargeId: number
+  orderId: number
+  price: number
+  startDate: string
+  endDate: string
+}export interface Playlog {
   ID: number
   musicId: number
   level: number
@@ -113,6 +126,12 @@ export interface ConfigsResult extends ApiResult {
 export interface TerminalsResult extends ApiResult {
   terminals: Terminal[]
 }
+export interface EventsResult extends ApiResult {
+  events: GameEvent[]
+}
+export interface ChargesResult extends ApiResult {
+  charges: GameCharge[]
+}
 export interface StatsResult extends ApiResult, Stats {}
 
 export interface AuthNotice {
@@ -133,6 +152,14 @@ export const API_PATHS = {
   createTerminal: '/api/admin/terminal/create',
   updateTerminal: '/api/admin/terminal/update',
   deleteTerminal: '/api/admin/terminal/delete',
+  events: '/api/admin/events',
+  createEvent: '/api/admin/event/create',
+  updateEvent: '/api/admin/event/update',
+  deleteEvent: '/api/admin/event/delete',
+  charges: '/api/admin/charges',
+  createCharge: '/api/admin/charge/create',
+  updateCharge: '/api/admin/charge/update',
+  deleteCharge: '/api/admin/charge/delete',
   configs: '/api/admin/config/get',
   updateConfig: '/api/admin/config/update',
 } as const
