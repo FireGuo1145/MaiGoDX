@@ -8,7 +8,36 @@ on:
 
 jobs:
   build:
+    name: Build (${{ matrix.os }} / ${{ matrix.arch }})
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            goos: linux
+            goarch: amd64
+          - os: linux
+            arch: arm64
+            goos: linux
+            goarch: arm64
+          - os: windows
+            arch: amd64
+            goos: windows
+            goarch: amd64
+          - os: windows
+            arch: arm64
+            goos: windows
+            goarch: arm64
+          - os: macos
+            arch: amd64
+            goos: darwin
+            goarch: amd64
+          - os: macos
+            arch: arm64
+            goos: darwin
+            goarch: arm64
 
     steps:
     - name: Checkout code
@@ -17,9 +46,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: web/package-lock.json
+        node-version: '24'
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -32,10 +59,20 @@ jobs:
         npm install
         npm run build
 
-    - name: Build Backend & Embedded App
+    - name: Build Backend Binary
+      env:
+        CGO_ENABLED: '0'
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
       run: |
-        go build -o maigodx .
-    
-    - name: Test Run / Verify Binary
-      run: |
-        ./maigodx --help || true
+        BINARY_NAME=maigodx-${{ matrix.os }}-${{ matrix.arch }}
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          BINARY_NAME="${BINARY_NAME}.exe"
+        fi
+        go build -o "${BINARY_NAME}" .
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: maigodx-${{ matrix.os }}-${{ matrix.arch }}
+        path: maigodx-*
