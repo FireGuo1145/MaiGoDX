@@ -227,6 +227,18 @@ func TestAquaDXParityEndpointsUseExpectedResponseShapes(t *testing.T) {
 	if region.PlayCount != 0 {
 		t.Fatalf("new region playCount=%d, want 0 to match AquaDX", region.PlayCount)
 	}
+	regionReq := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/GetUserRegionApi", strings.NewReader(`{"userId":100}`))
+	regionRes := httptest.NewRecorder()
+	MaimaiHandler(regionRes, regionReq)
+	var regionPayload map[string]interface{}
+	if err := json.Unmarshal(regionRes.Body.Bytes(), &regionPayload); err != nil {
+		t.Fatalf("decode user region: %v", err)
+	}
+	regionList := regionPayload["userRegionList"].([]interface{})
+	entry := regionList[0].(map[string]interface{})
+	if entry["regionId"] != float64(12) || entry["playCount"] != float64(0) || entry["userId"] != nil {
+		t.Fatalf("user region entry=%v", entry)
+	}
 }
 
 func TestCMPreviewAndKaleidxMatchAquaDX(t *testing.T) {

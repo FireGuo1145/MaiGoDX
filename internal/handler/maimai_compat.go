@@ -91,7 +91,11 @@ func maimaiCompatibilityPayload(apiName string, userID int64, body []byte) (inte
 	case "GetUserRegion":
 		var regions []model.UserRegion
 		database.DB.Where("user_id = ?", userID).Order("region_id asc").Find(&regions)
-		return map[string]interface{}{"userId": userID, "length": len(regions), "userRegionList": regions}, true
+		payload := make([]map[string]int, 0, len(regions))
+		for _, region := range regions {
+			payload = append(payload, map[string]int{"regionId": region.RegionID, "playCount": region.PlayCount})
+		}
+		return map[string]interface{}{"userId": userID, "length": len(payload), "userRegionList": payload}, true
 	case "UserLogin":
 		regionID := requestInt(body, "regionId")
 		if userID > 0 && regionID > 0 {
