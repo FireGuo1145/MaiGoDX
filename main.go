@@ -86,7 +86,7 @@ func main() {
 	})
 
 	// 压缩始终启用；开发模式下额外输出全量 HTTP 访问日志。
-	handlerWithMiddleware := middleware.AccessLogMiddleware(middleware.CompressionMiddleware(mux))
+	handlerWithMiddleware := middleware.AccessLogMiddleware(middleware.CompressionMiddleware(middleware.NormalizePathMiddleware(mux)))
 	var port string = os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
