@@ -53,7 +53,7 @@ export function MaimaiPage({ stats }: MaimaiPageProps) {
             {RANK_SUMMARY.map((rank) => (
               <Card key={rank} className="bg-slate-900 border-slate-800 text-center p-6">
                 <p className="text-2xl font-black text-indigo-400 mb-1">{rank}</p>
-                <p className="text-sm text-slate-500 font-bold">124 songs</p>
+                <p className="text-sm text-slate-500 font-bold">{stats?.rankCounts?.[rank] ?? 0} songs</p>
               </Card>
             ))}
           </div>

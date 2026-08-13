@@ -24,6 +24,7 @@ func main() {
 	// 注册认证、管理与卡片绑定 API 路由
 	mux.HandleFunc("/api/auth/register", handler.HandleRegister)
 	mux.HandleFunc("/api/auth/login", handler.HandleLogin)
+	mux.HandleFunc("/api/auth/logout", handler.HandleLogout)
 	mux.HandleFunc("/api/auth/verify", handler.HandleVerifyEmail)
 	mux.HandleFunc("/api/admin/users", handler.HandleAdminUsers)
 	mux.HandleFunc("/api/admin/config/get", handler.HandleGetConfigs)

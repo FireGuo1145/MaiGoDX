@@ -18,6 +18,7 @@ interface SettingsPageProps {
 export function SettingsPage({ user, cards, onCardsChanged }: SettingsPageProps) {
   const [accessCode, setAccessCode] = useState('')
   const [cardName, setCardName] = useState('')
+  const [gameUserId, setGameUserId] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
   const [isBinding, setIsBinding] = useState(false)
 
@@ -30,13 +31,20 @@ export function SettingsPage({ user, cards, onCardsChanged }: SettingsPageProps)
       return
     }
 
+    const parsedGameUserId = gameUserId.trim() === '' ? undefined : Number(gameUserId)
+    if (parsedGameUserId !== undefined && (!Number.isSafeInteger(parsedGameUserId) || parsedGameUserId <= 0)) {
+      setNotice('游戏用户 ID 必须是正整数；若尚未创建 maimai 档案可留空。')
+      return
+    }
+
     setIsBinding(true)
     setNotice(null)
     try {
-      const result = await api.bindCard(user.email, normalizedCode, cardName.trim() || DEFAULT_CARD_NAME)
+      const result = await api.bindCard(user.email, normalizedCode, cardName.trim() || DEFAULT_CARD_NAME, parsedGameUserId)
       if (!result.success) throw new Error(result.message || '卡片绑定失败')
       setAccessCode('')
       setCardName('')
+      setGameUserId('')
       setNotice('卡片绑定成功。')
       await onCardsChanged()
     } catch (error) {
@@ -88,6 +96,11 @@ export function SettingsPage({ user, cards, onCardsChanged }: SettingsPageProps)
                 <span className="text-xs font-medium text-slate-300">Card Alias / Nickname</span>
                 <input value={cardName} onChange={(event) => setCardName(event.target.value)} placeholder="My Main Card" className="w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-md text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </label>
+              <label className="space-y-2 sm:col-span-2">
+                <span className="text-xs font-medium text-slate-300">maimai Game User ID (optional)</span>
+                <input inputMode="numeric" value={gameUserId} onChange={(event) => setGameUserId(event.target.value.replace(/\D/g, ''))} placeholder="Enter the external user ID after the game creates the profile" className="w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-md text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <span className="block text-xs text-slate-500">Leave this blank until the game has created a profile. Add it later to display that profile’s scores in this portal.</span>
+              </label>
             </div>
             <Button isDisabled={isBinding} type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold">{isBinding ? 'Binding…' : 'Bind Card'}</Button>
           </form>
@@ -100,6 +113,7 @@ export function SettingsPage({ user, cards, onCardsChanged }: SettingsPageProps)
                 <div>
                   <p className="font-bold text-white text-sm">{card.cardName || DEFAULT_CARD_NAME}</p>
                   <p className="font-mono text-xs text-indigo-400">{cardPreview(card.accessCode)}</p>
+                  <p className="font-mono text-xs text-slate-500">Game user ID: {card.gameUserId || 'not linked'}</p>
                 </div>
                 <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Bound</Badge>
               </div>

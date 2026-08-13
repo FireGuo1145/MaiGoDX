@@ -64,6 +64,16 @@ func InitDB() {
 		&model.UserItem{},
 		&model.UserMap{},
 		&model.UserFavorite{},
+		&model.UserMusicDetail{},
+		&model.UserCourse{},
+		&model.UserLoginBonus{},
+		&model.UserGeneralData{},
+		&model.UserUdemae{},
+		&model.UserKaleidx{},
+		&model.UserIntimate{},
+		&model.UserActivity{},
+		&model.UserGameCard{},
+		&model.UserPrintDetail{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto migrate database: %v", err)
@@ -85,18 +95,43 @@ func InitDB() {
 		log.Println("[MaiGoDX] Default administrator created: admin@maigodx.local / admin123")
 	}
 
-	// 系统初始化：检查默认系统配置
-	var configCount int64
-	DB.Model(&model.SystemConfig{}).Count(&configCount)
-	if configCount == 0 {
-		defaultConfigs := []model.SystemConfig{
-			{Key: "maintenance_mode", Value: "false", Desc: "服务器全局维护模式开关 (true/false)"},
-			{Key: "event_mode", Value: "false", Desc: "限时活动模式开关 (true/false)"},
-			{Key: "notice_banner", Value: "欢迎来到 MaiGoDX 街机服务器！", Desc: "全服公告横幅内容"},
-		}
-		DB.Create(&defaultConfigs)
-		log.Println("[MaiGoDX] Default system configurations initialized.")
+	// 系统初始化：以键为粒度补齐默认配置，保留管理员已经修改过的值。
+	defaultConfigs := []model.SystemConfig{
+		{Key: "maintenance_mode", Value: "false", Desc: "服务器全局维护模式开关 (true/false)"},
+		{Key: "event_mode", Value: "false", Desc: "限时活动模式开关 (true/false)"},
+		{Key: "notice_banner", Value: "欢迎来到 MaiGoDX 街机服务器！", Desc: "全服公告横幅内容"},
+		{Key: "maimai_endpoint_salts", Value: "", Desc: "maimai 加密端点盐值；多个十六进制盐值以逗号分隔"},
+		{Key: "card_print_expiration_days", Value: "15", Desc: "maimai 卡片打印凭证有效天数"},
+		{Key: "game_reboot_start_time", Value: "", Desc: "maimai 机台重启开始时间"},
+		{Key: "game_reboot_end_time", Value: "", Desc: "maimai 机台重启结束时间"},
+		{Key: "game_reboot_interval", Value: "0", Desc: "maimai 机台重启间隔"},
+		{Key: "game_request_interval", Value: "10", Desc: "maimai 请求间隔"},
+		{Key: "game_movie_upload_limit", Value: "0", Desc: "maimai 视频上传限制"},
+		{Key: "game_movie_status", Value: "0", Desc: "maimai 视频服务状态"},
+		{Key: "game_movie_server_uri", Value: "", Desc: "maimai 视频服务器地址"},
+		{Key: "game_deliver_server_uri", Value: "", Desc: "maimai 配送服务器地址"},
+		{Key: "game_old_server_uri", Value: "", Desc: "maimai 旧服务器地址"},
+		{Key: "game_usb_download_server_uri", Value: "", Desc: "maimai USB 下载服务器地址"},
+		{Key: "game_ping_disable", Value: "true", Desc: "maimai 是否禁用 Ping"},
+		{Key: "game_packet_timeout", Value: "20000", Desc: "maimai 数据包超时毫秒数"},
+		{Key: "game_packet_timeout_long", Value: "60000", Desc: "maimai 长数据包超时毫秒数"},
+		{Key: "game_packet_retry_count", Value: "5", Desc: "maimai 数据包重试次数"},
+		{Key: "game_user_data_download_error_timeout", Value: "300000", Desc: "maimai 用户数据下载错误超时毫秒数"},
+		{Key: "game_user_data_download_error_retry_count", Value: "5", Desc: "maimai 用户数据下载错误重试次数"},
+		{Key: "game_user_data_download_same_packet_retry_count", Value: "5", Desc: "maimai 用户数据下载同包重试次数"},
+		{Key: "game_user_data_upload_skip_timeout", Value: "0", Desc: "maimai 用户数据上传跳过超时毫秒数"},
+		{Key: "game_user_data_upload_skip_retry_count", Value: "0", Desc: "maimai 用户数据上传跳过重试次数"},
+		{Key: "game_icon_photo_disable", Value: "true", Desc: "maimai 是否禁用头像照片"},
+		{Key: "game_upload_photo_disable", Value: "false", Desc: "maimai 是否禁用成绩照片上传"},
+		{Key: "game_max_count_music", Value: "0", Desc: "maimai 音乐下发最大数量"},
+		{Key: "game_max_count_item", Value: "0", Desc: "maimai 道具下发最大数量"},
 	}
+	for _, config := range defaultConfigs {
+		if err := DB.Where("key = ?", config.Key).FirstOrCreate(&config).Error; err != nil {
+			log.Fatalf("Failed to initialize system config %s: %v", config.Key, err)
+		}
+	}
+	log.Println("[MaiGoDX] Default system configurations initialized.")
 
 	log.Printf("[MaiGoDX] Database initialized successfully using driver: %s", dbType)
 }

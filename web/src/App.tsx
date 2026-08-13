@@ -21,6 +21,7 @@ export default function App() {
   const [configs, setConfigs] = useState<SystemConfig[]>([])
 
   const refreshStats = async () => {
+    if (!user) return
     try {
       const result = await api.getStats()
       if (result.success) setStats(result)
@@ -32,7 +33,7 @@ export default function App() {
   const refreshCards = async () => {
     if (!user) return
     try {
-      const result = await api.getCards(user.email)
+      const result = await api.getCards()
       if (result.success) setCards(result.cards || [])
     } catch (error) {
       console.error('Failed to load cards:', apiErrorMessage(error))
@@ -68,6 +69,7 @@ export default function App() {
   }, [user])
 
   const logout = () => {
+    void api.logout()
     setUser(null)
     setPage('home')
     setStats(null)

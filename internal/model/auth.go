@@ -1,25 +1,32 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // UserAccount 对应用户登录注册与邮箱验证账号模型
 type UserAccount struct {
 	gorm.Model
-	Email        string `gorm:"uniqueIndex;not null" json:"email"`
-	PasswordHash string `gorm:"not null" json:"-"`
-	Username     string `json:"username"`
-	IsVerified   bool   `gorm:"default:false" json:"isVerified"`
-	VerifyToken  string `json:"verifyToken"`
-	IsAdmin      bool   `gorm:"default:false" json:"isAdmin"`
+	Email            string    `gorm:"uniqueIndex;not null" json:"email"`
+	PasswordHash     string    `gorm:"not null" json:"-"`
+	Username         string    `json:"username"`
+	IsVerified       bool      `gorm:"default:false" json:"isVerified"`
+	VerifyToken      string    `json:"verifyToken"`
+	IsAdmin          bool      `gorm:"default:false" json:"isAdmin"`
+	SessionToken     string    `gorm:"uniqueIndex" json:"-"`
+	SessionExpiresAt time.Time `json:"-"`
 }
 
 // UserCard 对应 Aime 卡片绑定模型
 type UserCard struct {
 	gorm.Model
-	UserID        uint   `json:"userId"`
-	AccessCode    string `gorm:"uniqueIndex;not null" json:"accessCode"` // 20位卡号
-	CardId        string `json:"cardId"`                                // ICCard ID
-	CardName      string `json:"cardName"`                              // 卡片备注名
+	UserID     uint   `json:"userId"`
+	AccessCode string `gorm:"uniqueIndex;not null" json:"accessCode"` // 20位卡号
+	CardId     string `json:"cardId"`                                 // ICCard ID
+	CardName   string `json:"cardName"`                               // 卡片备注名
+	GameUserID int64  `gorm:"index" json:"gameUserId"`                // maimai 卡片外部用户 ID
 }
 
 // SystemConfig 对应系统下发配置模型（管理员可控）
@@ -54,6 +61,7 @@ type BindCardRequest struct {
 	Email      string `json:"email"`
 	AccessCode string `json:"accessCode"`
 	CardName   string `json:"cardName"`
+	GameUserID int64  `json:"gameUserId"`
 }
 
 // UpdateConfigRequest 更新系统配置请求体

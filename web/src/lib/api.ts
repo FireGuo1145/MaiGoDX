@@ -1,6 +1,5 @@
 import {
   API_PATHS,
-  cardListPath,
   getJson,
   postJson,
   type ApiResult,
@@ -18,9 +17,10 @@ export const api = {
   register: (email: string, password: string, username: string) =>
     postJson<RegisterResult>(API_PATHS.register, { email, password, username }),
   verifyEmail: (email: string, token: string) => postJson<ApiResult>(API_PATHS.verify, { email, token }),
-  getCards: (email: string) => getJson<CardsResult>(cardListPath(email)),
-  bindCard: (email: string, accessCode: string, cardName: string) =>
-    postJson<ApiResult>(API_PATHS.bindCard, { email, accessCode, cardName }),
+  logout: () => postJson<ApiResult>('/api/auth/logout', {}),
+  getCards: () => getJson<CardsResult>(API_PATHS.cards),
+  bindCard: (email: string, accessCode: string, cardName: string, gameUserId?: number) =>
+    postJson<ApiResult>(API_PATHS.bindCard, { email, accessCode, cardName, gameUserId }),
   getUsers: () => getJson<UsersResult>(API_PATHS.users),
   getConfigs: () => getJson<ConfigsResult>(API_PATHS.configs),
   updateConfig: (key: string, value: string) => postJson<ApiResult>(API_PATHS.updateConfig, { key, value }),

@@ -20,7 +20,7 @@ function noticeForLogin(result: LoginResult): UserAccount {
     email: result.email,
     username: result.username,
     isVerified: true,
-    isAdmin: Boolean(result.isAdmin) || result.email === DEFAULT_ADMIN_EMAIL,
+    isAdmin: Boolean(result.isAdmin),
   }
 }
 

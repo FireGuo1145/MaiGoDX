@@ -95,15 +95,28 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	token, err := createSession(&account)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": "创建登录会话失败"})
+		return
+	}
+	setSessionCookie(w, token)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":  true,
-		"message":  "登录成功",
-		"username": account.Username,
-		"email":    account.Email,
+		"success": true, "message": "登录成功", "username": account.Username,
+		"email": account.Email, "isAdmin": account.IsAdmin,
 	})
 }
 
 // HandleVerifyEmail 处理邮箱验证
+func HandleLogout(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if account, ok := currentAccount(r); ok {
+		clearSession(w, account)
+	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "message": "已退出登录"})
+}
+
 func HandleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	body, _ := io.ReadAll(r.Body)

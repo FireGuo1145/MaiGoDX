@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -13,180 +15,177 @@ import (
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
 )
 
-// MaimaiHandler 处理所有 /Maimai2Servlet/ 下的请求
+// MaimaiHandler dispatches the public maimai2 servlet methods. All player-scoped
+// responses are selected by the userId carried by the game request.
 func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	parts := strings.Split(path, "/")
-	apiName := "Unknown"
-	if len(parts) > 0 {
-		apiName = parts[len(parts)-1]
-	}
-
-	if len(apiName) == 32 {
-		log.Printf("[MaiGoDX] Encrypted endpoint hash detected: %s", apiName)
-	}
-
-	log.Printf("[MaiGoDX] Handling API call: %s", apiName)
-
+	rawAPI := pathTail(r.URL.Path)
+	apiName := resolveMaimaiAPI(rawAPI, r.URL.Path)
 	w.Header().Set("Content-Type", "application/json")
 
-	bodyBytes, _ := io.ReadAll(r.Body)
-
-	var responseData interface{} = []interface{}{}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeGameResponse(w, apiName, 0, nil, "unable to read request body")
+		return
+	}
+	if len(apiName) == 32 {
+		log.Printf("[MaiGoDX] encrypted maimai endpoint is not mapped: %s", rawAPI)
+		writeGameResponse(w, rawAPI, 1, nil, "")
+		return
+	}
 
 	switch apiName {
-	case "GetUserPreview":
-		var detail model.UserDetail
-		if err := database.DB.First(&detail).Error; err != nil {
-			detail = model.UserDetail{
-				UserID:   114514,
-				UserName: "杂鱼大哥哥",
-				Rating:   15000,
-			}
-		}
-		responseData = detail
-
-	case "GetUserData":
-		var detail model.UserDetail
-		if err := database.DB.First(&detail).Error; err != nil {
-			detail = model.UserDetail{
-				UserID:            114514,
-				UserName:          "杂鱼大哥哥",
-				EquipGlassesID:    1,
-				EquipBackGroundID: 2,
-				EquipNamePlateID:  3,
-				EquipFrameID:      4,
-				EquipIconID:       5,
-				Rating:            15000,
-				MaxRating:         16000,
-				TotalPoint:        999999,
-			}
-		}
-		responseData = detail
-
-	case "GetUserCharacter":
-		var chars []model.UserCharacter
-		database.DB.Find(&chars)
-		responseData = map[string]interface{}{
-			"userId":            114514,
-			"userCharacterList": chars,
-		}
-
-	case "GetUserItem":
-		var items []model.UserItem
-		database.DB.Find(&items)
-		responseData = map[string]interface{}{
-			"userId":       114514,
-			"userItemList": items,
-		}
-
-	case "GetUserRating":
-		responseData = map[string]interface{}{
-			"userId":    114514,
-			"rating":    15000,
-			"maxRating": 16000,
-		}
-
-	case "GetGameRanking":
-		responseData = []interface{}{}
-
-	case "UploadUserPhoto":
-		HandleUploadUserPhoto(w, r, apiName)
-		return
-
-	case "UpsertUserPrint":
-		HandleUpsertUserPrint(w, r, apiName)
-		return
-
 	case "UpsertUserAll":
 		var req model.UpsertUserAllRequest
-		if err := json.Unmarshal(bodyBytes, &req); err == nil && len(req.UpsertUserAll.UserData) > 0 {
-			userData := req.UpsertUserAll.UserData[0]
-			database.DB.Save(&userData)
-
-			for _, playlog := range req.UpsertUserAll.UserPlaylogList {
-				playlog.UserID = userData.UserID
-				database.DB.Create(&playlog)
-			}
-			for _, char := range req.UpsertUserAll.UserCharacterList {
-				char.UserID = userData.UserID
-				database.DB.Save(&char)
-			}
-			for _, item := range req.UpsertUserAll.UserItemList {
-				item.UserID = userData.UserID
-				database.DB.Save(&item)
-			}
-			for _, m := range req.UpsertUserAll.UserMapList {
-				m.UserID = userData.UserID
-				database.DB.Save(&m)
-			}
-			log.Printf("[MaiGoDX] UpsertUserAll successfully processed for: %s", userData.UserName)
+		if err := json.Unmarshal(body, &req); err != nil {
+			writeGameResponse(w, apiName, 0, nil, "invalid UpsertUserAll payload")
+			return
 		}
-
-		resp := model.Response{
-			ReturnCode: 1,
-			ApiName:    "com.sega.maimai2servlet.api." + apiName,
+		if err := UpsertUserAll(req); err != nil {
+			writeGameResponse(w, apiName, 0, nil, err.Error())
+			return
 		}
-		_ = json.NewEncoder(w).Encode(resp)
+		writeGameResponse(w, apiName, 1, nil, "")
 		return
-
-	default:
-		resp := model.Response{
-			ReturnCode: 1,
-			ApiName:    "com.sega.maimai2servlet.api." + apiName,
-		}
-		_ = json.NewEncoder(w).Encode(resp)
+	case "UploadUserPlaylog":
+		handleUploadUserPlaylog(w, apiName, body)
+		return
+	case "UploadUserPhoto":
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		HandleUploadUserPhoto(w, r, apiName)
+		return
+	case "UpsertUserPrint":
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		HandleUpsertUserPrint(w, r, apiName)
 		return
 	}
 
-	resp := model.Response{
-		ReturnCode: 1,
-		ApiName:    "com.sega.maimai2servlet.api." + apiName,
-		Data:       responseData,
+	if isStaticMaimaiAPI(apiName) {
+		if data, handled, err := maimaiReadPayload(apiName, 0, body); handled {
+			if err != nil {
+				writeGameResponse(w, apiName, 0, nil, err.Error())
+			} else {
+				writeGameResponse(w, apiName, 1, data, "")
+			}
+			return
+		}
+		writeGameResponse(w, apiName, 1, nil, "")
+		return
 	}
 
-	_ = json.NewEncoder(w).Encode(resp)
+	userID := requestUserID(body)
+	if userID == 0 {
+		writeGameResponse(w, apiName, 0, nil, "missing userId")
+		return
+	}
+
+	if data, handled, err := maimaiReadPayload(apiName, userID, body); handled {
+		if err != nil {
+			writeGameResponse(w, apiName, 0, nil, err.Error())
+			return
+		}
+		writeGameResponse(w, apiName, 1, data, "")
+		return
+	}
+
+	// AquaDX deliberately treats unknown game API calls as no-ops so a newer
+	// client does not fail solely because it requested an optional endpoint.
+	writeGameResponse(w, apiName, 1, nil, "")
 }
 
-// HandleGetStats 提供给前端展示的统计数据
-func HandleGetStats(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	
-	var totalUsers int64
-	database.DB.Model(&model.UserAccount{}).Count(&totalUsers)
-
-	var totalPlays int64
-	database.DB.Model(&model.UserPlaylog{}).Count(&totalPlays)
-
-	var recentPlays []model.UserPlaylog
-	database.DB.Order("id desc").Limit(10).Find(&recentPlays)
-
+func handleUploadUserPlaylog(w http.ResponseWriter, apiName string, body []byte) {
+	var request struct {
+		UserID  int64             `json:"userId"`
+		Playlog model.UserPlaylog `json:"userPlaylog"`
+	}
+	if err := json.Unmarshal(body, &request); err != nil || request.UserID == 0 {
+		writeGameResponse(w, apiName, 0, nil, "invalid UploadUserPlaylog payload")
+		return
+	}
 	var detail model.UserDetail
-	database.DB.First(&detail)
-
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":     true,
-		"totalUsers":  totalUsers,
-		"totalPlays":  totalPlays,
-		"recentPlays": recentPlays,
-		"user":        detail,
-		"ratingComposition": map[string]interface{}{
-			"bests": []map[string]interface{}{
-				{"title": "PANDƏMONIUM", "level": "15+", "score": 1012345, "rating": 312},
-				{"title": "Tezcatlipoca", "level": "15", "score": 1009876, "rating": 298},
-				{"title": "Last Samurai", "level": "14+", "score": 1008500, "rating": 280},
-				{"title": "Memory Forest", "level": "14+", "score": 1007200, "rating": 275},
-				{"title": "AXION", "level": "14", "score": 1005000, "rating": 260},
-			},
-			"newBests": []map[string]interface{}{
-				{"title": "VERTeX", "level": "14+", "score": 1009000, "rating": 290},
-				{"title": "Garakuta Doll Play", "level": "14", "score": 1006500, "rating": 270},
-			},
-		},
-	})
+	if err := database.DB.Where("user_id = ?", request.UserID).First(&detail).Error; err != nil {
+		queuePlaylog(request.UserID, request.Playlog)
+		writeGameResponse(w, apiName, 1, nil, "")
+		return
+	}
+	if err := SaveUserPlaylog(database.DB, detail.UserID, request.Playlog); err != nil {
+		writeGameResponse(w, apiName, 0, nil, err.Error())
+		return
+	}
+	writeGameResponse(w, apiName, 1, nil, "")
 }
 
-// ComputeEndpointHash 模拟 MD5 哈希
+func requestUserID(body []byte) int64 {
+	var request struct {
+		UserID int64 `json:"userId"`
+	}
+	if err := json.Unmarshal(body, &request); err != nil {
+		return 0
+	}
+	return request.UserID
+}
+
+func userRating(userID int64) map[string]interface{} {
+	var detail model.UserDetail
+	_ = database.DB.Where("user_id = ?", userID).First(&detail).Error
+	var udemae model.UserUdemae
+	_ = database.DB.Where("user_id = ?", userID).First(&udemae).Error
+	return map[string]interface{}{
+		"userId": userID,
+		"userRating": map[string]interface{}{
+			"rating":            detail.Rating,
+			"ratingList":        loadRateData(userID, ratingKeyCurrent),
+			"newRatingList":     loadRateData(userID, ratingKeyNew),
+			"nextRatingList":    loadRateData(userID, ratingKeyNext),
+			"nextNewRatingList": loadRateData(userID, ratingKeyNextNew),
+			"udemae":            udemae,
+		},
+	}
+}
+
+func loadRateData(userID int64, key string) []model.UserRate {
+	var value model.UserGeneralData
+	if err := database.DB.Where("user_id = ? AND property_key = ?", userID, key).First(&value).Error; err != nil || value.PropertyValue == "" {
+		return []model.UserRate{}
+	}
+	rates := make([]model.UserRate, 0)
+	for _, item := range strings.Split(value.PropertyValue, ",") {
+		var rate model.UserRate
+		if _, err := fmt.Sscanf(item, "%d:%d:%d:%d", &rate.MusicID, &rate.Level, &rate.RomVersion, &rate.Achievement); err == nil {
+			rates = append(rates, rate)
+		}
+	}
+	return rates
+}
+
+func isStaticMaimaiAPI(apiName string) bool {
+	switch apiName {
+	case "GetGameSetting", "GetGameEvent", "GetGameCharge", "GetGameNgMusicId", "GetUserCardPrintError", "Ping", "RemoveToken", "UserLogout", "CMLogin", "CMLogout":
+		return true
+	default:
+		return false
+	}
+}
+
+func pathTail(path string) string {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	return parts[len(parts)-1]
+}
+
+func writeGameResponse(w http.ResponseWriter, apiName string, returnCode int, data interface{}, message string) {
+	// AquaDX serializes successful handler maps/lists directly. Only no-op and
+	// error responses use the servlet returnCode/apiName envelope.
+	if returnCode == 1 && data != nil {
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	responseAPI := apiName
+	if len(apiName) != 32 && apiName != "Ping" && !strings.HasSuffix(apiName, "Api") {
+		responseAPI += "Api"
+	}
+	_ = json.NewEncoder(w).Encode(model.Response{ReturnCode: returnCode, ApiName: "com.sega.maimai2servlet.api." + responseAPI, Message: message})
+}
+
+// ComputeEndpointHash returns the protocol MD5 routing hash for callers that need it.
 func ComputeEndpointHash(endpoint string, salt string) string {
 	hasher := md5.New()
 	hasher.Write([]byte(endpoint + salt))
