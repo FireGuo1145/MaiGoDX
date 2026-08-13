@@ -178,8 +178,8 @@ func gameSettingPayload() map[string]interface{} {
 	return map[string]interface{}{
 		"isAouAccession": true,
 		"gameSetting": map[string]interface{}{
-			"rebootStartTime":                   configValue(configs, "game_reboot_start_time", ""),
-			"rebootEndTime":                     configValue(configs, "game_reboot_end_time", ""),
+			"rebootStartTime":                   configNonEmptyValue(configs, "game_reboot_start_time", "2020-01-01 23:59:00.0"),
+			"rebootEndTime":                     configNonEmptyValue(configs, "game_reboot_end_time", "2020-01-01 23:59:00.0"),
 			"rebootInterval":                    configInt(configs, "game_reboot_interval", 0),
 			"isMaintenance":                     strings.EqualFold(configs["maintenance_mode"], "true"),
 			"requestInterval":                   configInt(configs, "game_request_interval", 10),
@@ -212,6 +212,13 @@ func configValue(values map[string]string, key, fallback string) string {
 	}
 	return fallback
 }
+func configNonEmptyValue(values map[string]string, key, fallback string) string {
+	if value, ok := values[key]; ok && strings.TrimSpace(value) != "" {
+		return value
+	}
+	return fallback
+}
+
 func configInt(values map[string]string, key string, fallback int) int {
 	value, err := strconv.Atoi(values[key])
 	if err != nil {

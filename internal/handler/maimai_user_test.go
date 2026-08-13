@@ -119,6 +119,9 @@ func TestGetGameSettingDoesNotRequireUserID(t *testing.T) {
 	if setting["isMaintenance"] != true {
 		t.Fatalf("maintenance config not applied: %v", setting["isMaintenance"])
 	}
+	if setting["rebootStartTime"] != "2020-01-01 23:59:00.0" || setting["rebootEndTime"] != "2020-01-01 23:59:00.0" {
+		t.Fatalf("AquaDX reboot-time fallback mismatch: start=%v end=%v", setting["rebootStartTime"], setting["rebootEndTime"])
+	}
 }
 
 func TestUpsertUserPrintPersistsCardAndReceipt(t *testing.T) {
