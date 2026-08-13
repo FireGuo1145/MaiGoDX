@@ -56,7 +56,7 @@ func serveAimeDBConnection(conn net.Conn) {
 		log.Printf("[MaiGoDX] AimeDB deadline error for %s: %v", remote, err)
 		return
 	}
-	request, err := readAimeDBRequest(conn)
+	request, encrypted, err := readAimeDBRequest(conn)
 	if err != nil {
 		log.Printf("[MaiGoDX] AimeDB rejected request from %s: %v", remote, err)
 		return
@@ -83,52 +83,72 @@ func serveAimeDBConnection(conn net.Conn) {
 		log.Printf("[MaiGoDX] AimeDB request complete without response: type=0x%02x game=%s keychip=%s remote=%s", requestType, gameID, keychip, remote)
 		return
 	}
-	if err := writeAimeDBResponse(conn, response); err != nil {
+	if err := writeAimeDBResponse(conn, response, encrypted); err != nil {
 		log.Printf("[MaiGoDX] AimeDB response error: type=0x%02x game=%s keychip=%s remote=%s error=%v", requestType, gameID, keychip, remote, err)
 		return
 	}
 	log.Printf("[MaiGoDX] AimeDB %s: type=0x%02x game=%s keychip=%s remote=%s", summary, requestType, gameID, keychip, remote)
 }
 
-func readAimeDBRequest(reader io.Reader) ([]byte, error) {
+func readAimeDBRequest(reader io.Reader) ([]byte, bool, error) {
 	first := make([]byte, aes.BlockSize)
 	if _, err := io.ReadFull(reader, first); err != nil {
-		return nil, fmt.Errorf("read initial block: %w", err)
+		return nil, false, fmt.Errorf("read initial block: %w", err)
 	}
-	plainHeader, err := cryptAimeDB(first, false)
-	if err != nil {
-		return nil, err
-	}
+
+	// AquaDX expects encrypted AiMeDB frames, while KanadeDX's daemon uses a
+	// PlainRequest path during bootstrap. Detect the standard little-endian
+	// magic before decrypting so both client variants share the same listener.
+	encrypted := true
+	plainHeader := append([]byte{}, first...)
 	if binary.LittleEndian.Uint16(plainHeader[0:2]) != 0xa13e {
-		return nil, errors.New("invalid AimeDB magic")
+		var err error
+		plainHeader, err = cryptAimeDB(first, false)
+		if err != nil {
+			return nil, false, err
+		}
+		if binary.LittleEndian.Uint16(plainHeader[0:2]) != 0xa13e {
+			return nil, false, fmt.Errorf("invalid AimeDB magic raw=%x decrypted=%x", first[0:2], plainHeader[0:2])
+		}
+	} else {
+		encrypted = false
 	}
+
 	length := int(binary.LittleEndian.Uint16(plainHeader[6:8]))
 	if length < 0x20 || length > 4096 || length%aes.BlockSize != 0 {
-		return nil, fmt.Errorf("invalid AimeDB packet length %d", length)
+		return nil, false, fmt.Errorf("invalid AimeDB packet length %d", length)
 	}
 	packet := append([]byte{}, first...)
 	if length > len(packet) {
 		rest := make([]byte, length-len(packet))
 		if _, err := io.ReadFull(reader, rest); err != nil {
-			return nil, fmt.Errorf("read request body: %w", err)
+			return nil, false, fmt.Errorf("read request body: %w", err)
 		}
 		packet = append(packet, rest...)
 	}
-	return cryptAimeDB(packet, false)
+	if encrypted {
+		plain, err := cryptAimeDB(packet, false)
+		return plain, true, err
+	}
+	return packet, false, nil
 }
 
-func writeAimeDBResponse(writer io.Writer, response []byte) error {
+func writeAimeDBResponse(writer io.Writer, response []byte, encrypted bool) error {
 	if len(response) < 0x20 || len(response)%aes.BlockSize != 0 {
 		return fmt.Errorf("invalid AimeDB response size %d", len(response))
 	}
 	binary.LittleEndian.PutUint16(response[0x00:0x02], 0xa13e)
 	binary.LittleEndian.PutUint16(response[0x02:0x04], 0x3087)
 	binary.LittleEndian.PutUint16(response[0x06:0x08], uint16(len(response)))
-	encrypted, err := cryptAimeDB(response, true)
-	if err != nil {
-		return err
+	payload := response
+	if encrypted {
+		var err error
+		payload, err = cryptAimeDB(response, true)
+		if err != nil {
+			return err
+		}
 	}
-	_, err = writer.Write(encrypted)
+	_, err := writer.Write(payload)
 	return err
 }
 
