@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,34 +41,47 @@ func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 		terminalReject(w, r, "PowerOn", "missing serial or game_id")
 		return
 	}
+	parsedVersion, err := strconv.ParseFloat(version, 64)
+	if err != nil || parsedVersion < 1.0 {
+		log.Printf("[MaiGoDX] ALL.Net PowerOn rejected: keychip=%s game=%s version=%q is below 1.0", keychip, gameID, version)
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte(""))
+		return
+	}
 	terminal, err := findTerminalByKeychip(keychip)
 	if err != nil {
 		log.Printf("[MaiGoDX] ALL.Net PowerOn database error: keychip=%s game=%s error=%v", keychip, gameID, err)
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
-	if terminal.ID == 0 {
+	protected := allNetKeychipProtectionEnabled()
+	permissive := allNetKeychipPermissive()
+	if protected && terminal.ID == 0 && !permissive {
 		terminalReject(w, r, "PowerOn", "keychip is not registered: "+keychip)
 		return
 	}
-	if !terminal.IsEnabled {
+	if protected && terminal.ID != 0 && !terminal.IsEnabled {
 		terminalReject(w, r, "PowerOn", "keychip is disabled: "+terminal.KeychipID)
 		return
 	}
-	// AquaDX authenticates a Keychip independently from the requested game ID.
-	// Keep the configured game ID for portal display, but do not reject a valid
-	// authenticated Keychip merely because the cabinet reports another game code.
-	if terminal.GameID != "" && !strings.EqualFold(terminal.GameID, gameID) {
-		log.Printf("[MaiGoDX] ALL.Net PowerOn compatibility: keychip=%s configured_game=%s requested_game=%s; accepting authenticated session", terminal.KeychipID, terminal.GameID, gameID)
+	if terminal.ID != 0 {
+		// AquaDX authenticates a Keychip independently from the requested game ID.
+		// Keep the configured game ID for portal display, but do not reject a valid
+		// authenticated Keychip merely because the cabinet reports another game code.
+		if terminal.GameID != "" && !strings.EqualFold(terminal.GameID, gameID) {
+			log.Printf("[MaiGoDX] ALL.Net PowerOn compatibility: keychip=%s configured_game=%s requested_game=%s; accepting authenticated session", terminal.KeychipID, terminal.GameID, gameID)
+		}
+		terminal.GameVersion = version
+		terminal.LastSeenAt = time.Now()
+		terminal.LastSeenIP = clientIP(r)
+		if err := database.DB.Save(&terminal).Error; err != nil {
+			log.Printf("[MaiGoDX] ALL.Net PowerOn warning: failed to update terminal %d: %v", terminal.ID, err)
+		}
+	} else {
+		log.Printf("[MaiGoDX] ALL.Net PowerOn permissive compatibility: accepting unregistered keychip=%s game=%s", keychip, gameID)
 	}
-	terminal.GameVersion = version
-	terminal.LastSeenAt = time.Now()
-	terminal.LastSeenIP = clientIP(r)
-	if err := database.DB.Save(&terminal).Error; err != nil {
-		log.Printf("[MaiGoDX] ALL.Net PowerOn warning: failed to update terminal %d: %v", terminal.ID, err)
-	}
-	base := forwardedHost(r)
-	uriBase := "http://" + base
+	base := allNetPublicHost(r)
+	uriBase := allNetPublicScheme() + "://" + base
 	routeMode := "g"
 	sessionLog := "disabled"
 
@@ -75,7 +89,7 @@ func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 	// enabled. Its default PowerOn response uses /g/{game}/{version}/. Keep
 	// terminal registration for ownership and auditing, but make protection an
 	// opt-in server setting so ordinary clients retain AquaDX-compatible routes.
-	if allNetKeychipProtectionEnabled() {
+	if protected {
 		token, err := createTerminalSession(&terminal, gameID)
 		if err != nil {
 			log.Printf("[MaiGoDX] ALL.Net PowerOn session creation failed: keychip=%s error=%v", terminal.KeychipID, err)
@@ -90,7 +104,7 @@ func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 	}
 	uri := uriBase + "/" + gameID + "/" + version + "/"
 	fields := aquaPowerOnFields(uri, base, request["token"], request["format_ver"])
-	log.Printf("[MaiGoDX] ALL.Net PowerOn accepted: keychip=%s terminal=%d game=%s version=%s route=%s session=%s uri=%s remote=%s", terminal.KeychipID, terminal.ID, gameID, version, routeMode, sessionLog, uri, clientIP(r))
+	log.Printf("[MaiGoDX] ALL.Net PowerOn accepted: keychip=%s terminal=%d game=%s version=%s route=%s session=%s uri=%s remote=%s", keychip, terminal.ID, gameID, version, routeMode, sessionLog, uri, clientIP(r))
 	// AquaDX returns a plain URL-formatted response with a trailing newline.
 	// KanadeDX parses this with Split('&') and Split('='), so compressed DFI
 	// output or missing base fields causes its PowerOn parser to fail.
@@ -129,9 +143,26 @@ func HandleTerminalMaimai(w http.ResponseWriter, r *http.Request) {
 }
 
 func allNetKeychipProtectionEnabled() bool {
-	var config model.SystemConfig
-	lookup := database.DB.Where(&model.SystemConfig{Key: "allnet_check_keychip"}).Limit(1).Find(&config)
-	return lookup.Error == nil && lookup.RowsAffected > 0 && strings.EqualFold(strings.TrimSpace(config.Value), "true")
+	return strings.EqualFold(maimaiConfigValue("allnet_check_keychip", "false"), "true")
+}
+
+func allNetKeychipPermissive() bool {
+	return strings.EqualFold(maimaiConfigValue("allnet_keychip_permissive", "false"), "true")
+}
+
+func allNetPublicHost(r *http.Request) string {
+	if configured := strings.TrimSpace(maimaiConfigValue("allnet_public_host", "")); configured != "" {
+		return configured
+	}
+	return forwardedHost(r)
+}
+
+func allNetPublicScheme() string {
+	scheme := strings.ToLower(strings.TrimSpace(maimaiConfigValue("allnet_public_scheme", "http")))
+	if scheme == "https" {
+		return scheme
+	}
+	return "http"
 }
 
 func createTerminalSession(terminal *model.Terminal, gameID string) (string, error) {
@@ -199,15 +230,15 @@ func aquaPowerOnFields(uri, host, clientToken, formatVersion string) []allNetFie
 	// Deliberately do not URL-escape or compress: AquaDX writes resp.toUrl()+"\n".
 	fields := []allNetField{
 		{key: "stat", value: "1"},
-		{key: "name", value: ""},
-		{key: "place_id", value: "123"},
-		{key: "region0", value: "1"},
-		{key: "region_name0", value: "W"},
-		{key: "region_name1", value: "X"},
-		{key: "region_name2", value: "Y"},
-		{key: "region_name3", value: "Z"},
-		{key: "country", value: "JPN"},
-		{key: "nickname", value: ""},
+		{key: "name", value: maimaiConfigValue("allnet_name", "")},
+		{key: "place_id", value: maimaiConfigValue("allnet_place_id", "123")},
+		{key: "region0", value: maimaiConfigValue("allnet_region0", "1")},
+		{key: "region_name0", value: maimaiConfigValue("allnet_region_name0", "W")},
+		{key: "region_name1", value: maimaiConfigValue("allnet_region_name1", "X")},
+		{key: "region_name2", value: maimaiConfigValue("allnet_region_name2", "Y")},
+		{key: "region_name3", value: maimaiConfigValue("allnet_region_name3", "Z")},
+		{key: "country", value: maimaiConfigValue("allnet_country", "JPN")},
+		{key: "nickname", value: maimaiConfigValue("allnet_nickname", "")},
 		{key: "uri", value: uri},
 		{key: "host", value: host},
 	}
