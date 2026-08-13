@@ -224,3 +224,37 @@ func TestAquaDXParityEndpointsUseExpectedResponseShapes(t *testing.T) {
 		t.Fatalf("new region playCount=%d, want 0 to match AquaDX", region.PlayCount)
 	}
 }
+
+func TestCMPreviewAndKaleidxMatchAquaDX(t *testing.T) {
+	setupMaimaiTestDB(t)
+	if err := database.DB.Create(&model.UserDetail{UserID: 501, UserName: "CardMaker", Rating: 12345, LastDataVersion: "1.60"}).Error; err != nil {
+		t.Fatalf("create profile: %v", err)
+	}
+
+	previewReq := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/CMGetUserPreviewApi", strings.NewReader(`{"userId":501}`))
+	previewRes := httptest.NewRecorder()
+	MaimaiHandler(previewRes, previewReq)
+	var preview map[string]interface{}
+	if err := json.Unmarshal(previewRes.Body.Bytes(), &preview); err != nil {
+		t.Fatalf("decode CM preview: %v", err)
+	}
+	if preview["rating"] != float64(12345) || preview["playerRating"] != nil || preview["isExistSellingCard"] != false {
+		t.Fatalf("CM preview differs from AquaDX shape: %v", preview)
+	}
+
+	kaleidxReq := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/GetUserKaleidxScopeApi", strings.NewReader(`{"userId":501}`))
+	kaleidxRes := httptest.NewRecorder()
+	MaimaiHandler(kaleidxRes, kaleidxReq)
+	var gates []map[string]interface{}
+	if err := json.Unmarshal(kaleidxRes.Body.Bytes(), &gates); err != nil {
+		t.Fatalf("decode Kaleidx scopes: %v", err)
+	}
+	if len(gates) != 6 {
+		t.Fatalf("Kaleidx initial gate count=%d, want 6", len(gates))
+	}
+	for index, gate := range gates {
+		if gate["gateId"] != float64(index+1) || gate["isGateFound"] != true || gate["isKeyFound"] != true {
+			t.Fatalf("unexpected Kaleidx gate %d: %v", index+1, gate)
+		}
+	}
+}

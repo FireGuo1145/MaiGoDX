@@ -27,7 +27,15 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 	}
 
 	switch apiName {
-	case "GetUserPreview", "CMGetUserPreview":
+	case "CMGetUserPreview":
+		if err := loadProfile(); err != nil {
+			return nil, true, err
+		}
+		return map[string]interface{}{
+			"userId": userID, "userName": detail.UserName, "rating": detail.Rating,
+			"lastDataVersion": detail.LastDataVersion, "isLogin": false, "isExistSellingCard": false,
+		}, true, nil
+	case "GetUserPreview":
 		if err := loadProfile(); err != nil {
 			return nil, true, err
 		}
@@ -118,9 +126,46 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 		}
 		return map[string]interface{}{"userActivity": map[string]interface{}{"playList": play, "musicList": music}}, true, nil
 	case "GetUserKaleidxScope":
+		if err := loadProfile(); err != nil {
+			return nil, true, err
+		}
 		var values []model.UserKaleidx
-		database.DB.Where("user_id = ?", userID).Order("gate_id asc").Find(&values)
-		return values, true, nil
+		if err := database.DB.Where("user_id = ?", userID).Order("gate_id asc").Find(&values).Error; err != nil {
+			return nil, true, err
+		}
+		gates := make(map[int]model.UserKaleidx, len(values))
+		for _, value := range values {
+			gates[value.GateID] = value
+		}
+		unlockGate := func(gateID int) {
+			gate, exists := gates[gateID]
+			if !exists {
+				gate = model.UserKaleidx{UserID: userID, GateID: gateID}
+			}
+			gate.IsGateFound = true
+			gate.IsKeyFound = true
+			gates[gateID] = gate
+		}
+		for gateID := 1; gateID <= 6; gateID++ {
+			unlockGate(gateID)
+		}
+		for gateID := 6; gateID <= 9; gateID++ {
+			if gates[gateID].IsClear {
+				unlockGate(gateID + 1)
+			}
+		}
+		result := make([]model.UserKaleidx, 0, len(gates))
+		for gateID := 1; gateID <= 10; gateID++ {
+			if gate, exists := gates[gateID]; exists {
+				if gate.ID == 0 {
+					if err := database.DB.Create(&gate).Error; err != nil {
+						return nil, true, err
+					}
+				}
+				result = append(result, gate)
+			}
+		}
+		return result, true, nil
 	case "GetUserIntimate":
 		var values []model.UserIntimate
 		database.DB.Where("user_id = ?", userID).Find(&values)
