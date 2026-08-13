@@ -26,11 +26,11 @@ func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 
 	bodyBytes, _ := io.ReadAll(r.Body)
 
-	var responseData interface{}
+	var responseData interface{} = []interface{}{}
+
 	switch apiName {
 	case "GetUserPreview":
 		var detail model.UserDetail
-		// 尝试从数据库查询，若无则返回默认测试用户
 		if err := database.DB.First(&detail).Error; err != nil {
 			detail = model.UserDetail{
 				UserID:   114514,
@@ -58,19 +58,55 @@ func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		responseData = detail
 
+	case "GetUserCharacter":
+		var chars []model.UserCharacter
+		database.DB.Find(&chars)
+		responseData = map[string]interface{}{
+			"userId":            114514,
+			"userCharacterList": chars,
+		}
+
+	case "GetUserItem":
+		var items []model.UserItem
+		database.DB.Find(&items)
+		responseData = map[string]interface{}{
+			"userId":       114514,
+			"userItemList": items,
+		}
+
+	case "GetUserRating":
+		responseData = map[string]interface{}{
+			"userId": 114514,
+			"rating": 15000,
+			"maxRating": 16000,
+		}
+
+	case "GetGameRanking":
+		responseData = []interface{}{}
+
 	case "UpsertUserAll":
 		var req model.UpsertUserAllRequest
 		if err := json.Unmarshal(bodyBytes, &req); err == nil && len(req.UpsertUserAll.UserData) > 0 {
 			userData := req.UpsertUserAll.UserData[0]
-			// 保存或更新玩家数据
 			database.DB.Save(&userData)
 
-			// 保存成绩记录
 			for _, playlog := range req.UpsertUserAll.UserPlaylogList {
 				playlog.UserID = userData.UserID
 				database.DB.Create(&playlog)
 			}
-			log.Printf("[MaiGoDX] UpsertUserAll processed successfully for user: %s", userData.UserName)
+			for _, char := range req.UpsertUserAll.UserCharacterList {
+				char.UserID = userData.UserID
+				database.DB.Save(&char)
+			}
+			for _, item := range req.UpsertUserAll.UserItemList {
+				item.UserID = userData.UserID
+				database.DB.Save(&item)
+			}
+			for _, m := range req.UpsertUserAll.UserMapList {
+				m.UserID = userData.UserID
+				database.DB.Save(&m)
+			}
+			log.Printf("[MaiGoDX] UpsertUserAll successfully processed for: %s", userData.UserName)
 		}
 
 		resp := model.Response{
