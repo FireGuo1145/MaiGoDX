@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -248,26 +249,54 @@ func aimeRegister(request []byte) ([]byte, string, error) {
 }
 
 func aimeFelicaLookupV1(request []byte) ([]byte, string, error) {
-	if len(request) < 0x30 {
-		return nil, "", errors.New("short Felica v1 request")
+	accessCode, err := aimeFelicaAccessCode(request, 0x20)
+	if err != nil {
+		return nil, "", err
+	}
+	accessCodeBytes, err := hex.DecodeString(accessCode)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode Felica v1 access code: %w", err)
 	}
 	response := aimeStaticResponse(0x30, 0x03, 1)
-	copy(response[0x24:0x2e], request[0x20:0x2a])
-	return response, "felica-v1", nil
+	copy(response[0x24:0x2e], accessCodeBytes)
+	return response, "felica-v1 access=" + maskAimeAccessCode(accessCode), nil
 }
 
 func aimeFelicaLookupV2(request []byte) ([]byte, string, error) {
-	if len(request) < 0x38 {
-		return nil, "", errors.New("short Felica v2 request")
+	// AquaDX reads the IDm at 0x30 as a signed big-endian 64-bit value,
+	// converts its decimal representation to a 20-digit access code, then
+	// resolves that card to the game's external user ID.
+	accessCode, err := aimeFelicaAccessCode(request, 0x30)
+	if err != nil {
+		return nil, "", err
 	}
-	// SDGA's normal Aime reader uses LookupV2. Keep the Felica reply shape
-	// compatible and report an unknown card until an access code is registered.
+	aimeID, found, err := aimeCardID(accessCode, false)
+	if err != nil {
+		return nil, "", err
+	}
+	if !found {
+		aimeID = -1
+	}
+	accessCodeBytes, err := hex.DecodeString(accessCode)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode Felica v2 access code: %w", err)
+	}
 	response := aimeStaticResponse(0x140, 0x12, 1)
-	binary.LittleEndian.PutUint64(response[0x20:0x28], ^uint64(0))
+	binary.LittleEndian.PutUint64(response[0x20:0x28], uint64(aimeID))
 	binary.LittleEndian.PutUint32(response[0x24:0x28], ^uint32(0))
 	binary.LittleEndian.PutUint32(response[0x28:0x2c], ^uint32(0))
+	copy(response[0x2c:0x36], accessCodeBytes)
 	response[0x37] = 0x01
-	return response, "felica-v2 unknown", nil
+	return response, fmt.Sprintf("felica-v2 access=%s found=%t aimeId=%d", maskAimeAccessCode(accessCode), found, aimeID), nil
+}
+
+func aimeFelicaAccessCode(request []byte, offset int) (string, error) {
+	if len(request) < offset+8 {
+		return "", errors.New("short Felica request")
+	}
+	idm := int64(binary.BigEndian.Uint64(request[offset : offset+8]))
+	value := strings.TrimPrefix(strconv.FormatInt(idm, 10), "-")
+	return strings.Repeat("0", max(0, 20-len(value))) + value, nil
 }
 
 func aimeStaticResponse(size int, responseCode, status uint16) []byte {
