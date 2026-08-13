@@ -9,7 +9,7 @@ import { HomePage } from '@/pages/HomePage'
 import { MaimaiPage } from '@/pages/MaimaiPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { SetupPage } from '@/pages/SetupPage'
-import type { PageId, Stats, SystemConfig, UserAccount, UserCard } from '@/types'
+import type { LoginResult, PageId, Stats, SystemConfig, UserAccount, UserCard } from '@/types'
 import { apiErrorMessage } from '@/types'
 
 const pagePaths: Record<PageId, string> = {
@@ -26,8 +26,19 @@ function pageFromPath(pathname: string): PageId {
   return match?.[0] ?? 'home'
 }
 
+function accountFromSession(result: LoginResult): UserAccount {
+  return {
+    ID: 0,
+    email: result.email,
+    username: result.username,
+    isVerified: true,
+    isAdmin: Boolean(result.isAdmin),
+  }
+}
+
 export default function App() {
   const [user, setUser] = useState<UserAccount | null>(null)
+  const [isAuthReady, setIsAuthReady] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [stats, setStats] = useState<Stats | null>(null)
   const [cards, setCards] = useState<UserCard[]>([])
@@ -36,6 +47,19 @@ export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
   const page = pageFromPath(location.pathname)
+
+  useEffect(() => {
+    let active = true
+    void api.currentUser()
+      .then((result) => {
+        if (active && result.success) setUser(accountFromSession(result))
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setIsAuthReady(true)
+      })
+    return () => { active = false }
+  }, [])
 
   const refreshStats = async () => {
     if (!user) return
@@ -93,6 +117,10 @@ export default function App() {
     setUsers([])
     setConfigs([])
     navigate('/', { replace: true })
+  }
+
+  if (!isAuthReady) {
+    return <div className="min-h-screen bg-slate-950 text-slate-400 flex items-center justify-center">正在恢复登录会话…</div>
   }
 
   if (!user) {

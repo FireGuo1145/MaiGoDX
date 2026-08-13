@@ -9,9 +9,9 @@ interface AuthPageProps {
 }
 
 const copy: Record<AuthMode, { title: string; description: string }> = {
-  login: { title: 'Welcome Back', description: 'Enter your credentials to access the portal.' },
-  register: { title: 'Create Account', description: 'Create an account and verify your email to access the portal.' },
-  verify: { title: 'Verify Email', description: 'Enter the verification token associated with your account.' },
+  login: { title: '欢迎回来', description: '请输入账号和密码以进入管理门户。' },
+  register: { title: '创建账户', description: '创建账户并完成邮箱验证后即可进入管理门户。' },
+  verify: { title: '验证邮箱', description: '请输入与账户关联的邮箱验证令牌。' },
 }
 
 function noticeForLogin(result: LoginResult): UserAccount {
@@ -92,7 +92,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
       <div className="w-full max-w-[400px] space-y-8">
         <div className="text-center">
           <h1 className="text-4xl font-black tracking-tighter text-indigo-500">MaiGoDX</h1>
-          <p className="text-slate-400 mt-2">Next-Gen Arcade Game Server Portal</p>
+          <p className="text-slate-400 mt-2">街机游戏服务器管理门户</p>
         </div>
 
         <section className="bg-slate-900 border border-slate-800 shadow-2xl rounded-xl p-6">
@@ -104,7 +104,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
               <p>{notice.text}</p>
               {notice.developmentToken && (
                 <p className="mt-1 font-mono text-[10px] text-indigo-200/70 break-all">
-                  Development token: {notice.developmentToken}
+                  开发验证令牌：{notice.developmentToken}
                 </p>
               )}
             </div>
@@ -113,7 +113,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
           <form onSubmit={action} className="space-y-4 mt-6">
             {mode === 'register' && (
               <label className="block space-y-2">
-                <span className="text-sm font-medium text-slate-300">Username</span>
+                <span className="text-sm font-medium text-slate-300">用户名</span>
                 <input
                   required
                   value={username}
@@ -125,7 +125,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
             {mode !== 'verify' || !email ? (
               <label className="block space-y-2">
-                <span className="text-sm font-medium text-slate-300">Email</span>
+                <span className="text-sm font-medium text-slate-300">邮箱</span>
                 <input
                   type="email"
                   required
@@ -139,7 +139,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
             {mode !== 'verify' && (
               <label className="block space-y-2">
-                <span className="text-sm font-medium text-slate-300">Password</span>
+                <span className="text-sm font-medium text-slate-300">密码</span>
                 <input
                   type="password"
                   required
@@ -153,31 +153,31 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
             {mode === 'verify' && (
               <label className="block space-y-2">
-                <span className="text-sm font-medium text-slate-300">Verification token</span>
+                <span className="text-sm font-medium text-slate-300">验证令牌</span>
                 <input
                   required
                   value={token}
                   onChange={(event) => setToken(event.target.value)}
-                  placeholder="Enter verification token"
+                  placeholder="请输入验证令牌"
                   className="w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-md text-white focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
               </label>
             )}
 
             <Button isDisabled={isSubmitting} type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-11">
-              {isSubmitting ? 'Please wait…' : mode === 'login' ? 'Sign In' : mode === 'register' ? 'Sign Up' : 'Verify Email'}
+              {isSubmitting ? '请稍候…' : mode === 'login' ? '登录' : mode === 'register' ? '注册' : 'Verify Email'}
             </Button>
           </form>
 
           <div className="mt-5 text-center text-xs text-slate-500">
             {mode === 'login' && (
-              <>New here? <button type="button" onClick={() => setMode('register')} className="text-indigo-400 hover:underline">Create an account</button></>
+              <>还没有账户？<button type="button" onClick={() => setMode('register')} className="text-indigo-400 hover:underline">创建账户</button></>
             )}
             {mode === 'register' && (
-              <>Already have an account? <button type="button" onClick={() => setMode('login')} className="text-indigo-400 hover:underline">Sign in</button></>
+              <>已有账户？<button type="button" onClick={() => setMode('login')} className="text-indigo-400 hover:underline">登录</button></>
             )}
             {mode === 'verify' && (
-              <button type="button" onClick={() => setMode('login')} className="text-indigo-400 hover:underline">Back to sign in</button>
+              <button type="button" onClick={() => setMode('login')} className="text-indigo-400 hover:underline">返回登录</button>
             )}
           </div>
         </section>

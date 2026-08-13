@@ -26,10 +26,10 @@ function RatingList({ title, songs, tone, emptyMessage }: RatingListProps) {
         {songs?.length ? songs.map((song, index) => (
           <div key={`${song.musicId}-${song.level}-${index}`} className="flex items-center justify-between p-3 bg-slate-800/60 rounded-lg gap-4">
             <div className="min-w-0">
-              <p className="font-bold text-white text-sm truncate">Music ID: {song.musicId}</p>
-              <p className="text-xs text-slate-400">Level: {song.level} | Achievement: {(song.achievement / 10000).toFixed(4)}% | DX Score: {song.score.toLocaleString()}</p>
+              <p className="font-bold text-white text-sm truncate">乐曲 ID：{song.musicId}</p>
+              <p className="text-xs text-slate-400">难度：{song.level} | 达成率：{(song.achievement / 10000).toFixed(4)}% | DX 分数：{song.score.toLocaleString()}</p>
             </div>
-            <Badge className={`${badge} text-white font-mono shrink-0`}>Rank {song.scoreRank || '—'}</Badge>
+            <Badge className={`${badge} text-white font-mono shrink-0`}>评级 {song.scoreRank || '—'}</Badge>
           </div>
         )) : <p className="text-sm text-slate-500">{emptyMessage}</p>}
       </CardContent>
@@ -47,26 +47,26 @@ export function DashboardPage({ stats }: DashboardPageProps) {
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="bg-slate-900 border-slate-800">
-          <CardHeader className="pb-2"><CardDescription>Global Rating</CardDescription><CardTitle className="text-3xl text-white">{rating?.toLocaleString() ?? '—'}</CardTitle></CardHeader>
-          <CardContent><p className="text-xs text-emerald-400 flex items-center gap-1"><TrendingUp size={12} /> Max: {maxRating?.toLocaleString() ?? '—'}</p></CardContent>
+          <CardHeader className="pb-2"><CardDescription>当前 Rating</CardDescription><CardTitle className="text-3xl text-white">{rating?.toLocaleString() ?? '—'}</CardTitle></CardHeader>
+          <CardContent><p className="text-xs text-emerald-400 flex items-center gap-1"><TrendingUp size={12} /> 历史最高：{maxRating?.toLocaleString() ?? '—'}</p></CardContent>
         </Card>
         <Card className="bg-slate-900 border-slate-800">
-          <CardHeader className="pb-2"><CardDescription>Play Count</CardDescription><CardTitle className="text-3xl text-white">{playCount?.toLocaleString() ?? '—'}</CardTitle></CardHeader>
-          <CardContent><p className="text-xs text-slate-500">Recorded plays for the bound profile</p></CardContent>
+          <CardHeader className="pb-2"><CardDescription>游玩次数</CardDescription><CardTitle className="text-3xl text-white">{playCount?.toLocaleString() ?? '—'}</CardTitle></CardHeader>
+          <CardContent><p className="text-xs text-slate-500">已关联档案的成绩记录数</p></CardContent>
         </Card>
         <Card className="bg-slate-900 border-slate-800">
-          <CardHeader className="pb-2"><CardDescription>Profile Status</CardDescription><CardTitle className="text-3xl text-white">{stats?.user?.userName ?? 'Not linked'}</CardTitle></CardHeader>
-          <CardContent><p className="text-xs text-slate-500">{stats?.message ?? 'Live data from the bound maimai profile'}</p></CardContent>
+          <CardHeader className="pb-2"><CardDescription>档案状态</CardDescription><CardTitle className="text-3xl text-white">{stats?.user?.userName ?? '未关联'}</CardTitle></CardHeader>
+          <CardContent><p className="text-xs text-slate-500">{stats?.message ?? '已关联 maimai 档案的实时数据'}</p></CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RatingList title="Best Bests (Top Rating)" songs={stats?.ratingComposition?.bests} tone="indigo" emptyMessage="No composition data." />
-        <RatingList title="New Bests" songs={stats?.ratingComposition?.newBests} tone="emerald" emptyMessage="No new best data." />
+        <RatingList title="最佳成绩（旧曲）" songs={stats?.ratingComposition?.bests} tone="indigo" emptyMessage="暂无评级构成数据。" />
+        <RatingList title="最佳成绩（新曲）" songs={stats?.ratingComposition?.newBests} tone="emerald" emptyMessage="暂无新曲最佳成绩。" />
       </div>
 
       <Card className="bg-slate-900 border-slate-800">
-        <CardHeader><CardTitle className="text-white">Rating Trend</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-white">Rating 趋势</CardTitle></CardHeader>
         <CardContent className="h-[300px]">
           {trend.length ? (
             <ResponsiveContainer width="100%" height="100%">
@@ -78,7 +78,7 @@ export function DashboardPage({ stats }: DashboardPageProps) {
                 <Line type="monotone" dataKey="rating" stroke="#6366f1" strokeWidth={3} dot={{ r: 4, fill: '#6366f1' }} />
               </LineChart>
             </ResponsiveContainer>
-          ) : <p className="text-sm text-slate-500">No persisted rating history is available for this profile.</p>}
+          ) : <p className="text-sm text-slate-500">该档案暂无已持久化的 Rating 历史记录。</p>}
         </CardContent>
       </Card>
     </div>

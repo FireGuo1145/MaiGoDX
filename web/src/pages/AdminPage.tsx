@@ -26,7 +26,7 @@ function ConfigRow({ config, onSaved }: { config: SystemConfig; onSaved: () => P
     try {
       const result = await api.updateConfig(config.key, value)
       if (!result.success) throw new Error(result.message || '配置保存失败')
-      setStatus('Saved')
+      setStatus('已保存')
       await onSaved()
     } catch (error) {
       setStatus(apiErrorMessage(error))
@@ -42,15 +42,15 @@ function ConfigRow({ config, onSaved }: { config: SystemConfig; onSaved: () => P
         </div>
         {config.key.endsWith('_mode') && (
           <Badge className={isTruthyConfig(value) ? 'bg-amber-500/15 text-amber-300 border-amber-500/25' : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25'}>
-            {isTruthyConfig(value) ? 'Enabled' : 'Disabled'}
+            {isTruthyConfig(value) ? '已启用' : '已禁用'}
           </Badge>
         )}
       </div>
       <div className="flex gap-3">
         <input value={value} onChange={(event) => setValue(event.target.value)} onBlur={save} className="flex-1 h-9 px-3 bg-slate-900 border border-slate-700 rounded-md text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <Button type="button" size="sm" onClick={save} className="bg-indigo-600 hover:bg-indigo-500">Save</Button>
+        <Button type="button" size="sm" onClick={save} className="bg-indigo-600 hover:bg-indigo-500">保存</Button>
       </div>
-      {status && <p className={`text-xs ${status === 'Saved' ? 'text-emerald-400' : 'text-rose-400'}`}>{status}</p>}
+      {status && <p className={`text-xs ${status === '已保存' ? 'text-emerald-400' : 'text-rose-400'}`}>{status}</p>}
     </div>
   )
 }
@@ -61,14 +61,14 @@ export function AdminPage({ users, configs, onUsersChanged, onConfigsChanged }: 
       <section className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-bold flex items-center gap-2"><Users /> User Management</h2>
-          <Button type="button" onClick={onUsersChanged} size="sm" variant="outline" className="border-slate-700">Refresh List</Button>
+          <Button type="button" onClick={onUsersChanged} size="sm" variant="outline" className="border-slate-700">刷新列表</Button>
         </div>
         <Card className="bg-slate-900 border-slate-800 overflow-hidden">
           <Table>
             <TableHeader className="bg-slate-800/50">
-                <TableHead className="text-slate-300">User</TableHead>
-                <TableHead className="text-slate-300">Status</TableHead>
-                <TableHead className="text-slate-300">Role</TableHead>
+                <TableHead className="text-slate-300">用户</TableHead>
+                <TableHead className="text-slate-300">状态</TableHead>
+                <TableHead className="text-slate-300">角色</TableHead>
             </TableHeader>
             <TableBody>
               {users.length ? users.map((account) => (
@@ -79,10 +79,10 @@ export function AdminPage({ users, configs, onUsersChanged, onConfigsChanged }: 
                       <div><p className="font-bold text-white text-sm">{account.username}</p><p className="text-[10px] text-slate-500">{account.email}</p></div>
                     </div>
                   </TableCell>
-                  <TableCell>{account.isVerified ? <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Verified</Badge> : <Badge variant="outline" className="text-slate-500 border-slate-800">Pending</Badge>}</TableCell>
-                  <TableCell>{account.isAdmin ? <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20">Admin</Badge> : <Badge variant="outline" className="text-slate-500 border-slate-800">User</Badge>}</TableCell>
+                  <TableCell>{account.isVerified ? <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">已验证</Badge> : <Badge variant="outline" className="text-slate-500 border-slate-800">待验证</Badge>}</TableCell>
+                  <TableCell>{account.isAdmin ? <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20">管理员</Badge> : <Badge variant="outline" className="text-slate-500 border-slate-800">用户</Badge>}</TableCell>
                 </TableRow>
-              )) : <TableRow><TableCell className="text-center py-10 text-slate-500">No users found.</TableCell><TableCell /><TableCell /></TableRow>}
+              )) : <TableRow><TableCell className="text-center py-10 text-slate-500">未找到用户。</TableCell><TableCell /><TableCell /></TableRow>}
             </TableBody>
           </Table>
         </Card>
@@ -91,12 +91,12 @@ export function AdminPage({ users, configs, onUsersChanged, onConfigsChanged }: 
       <section className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-bold flex items-center gap-2"><Sliders /> Server Configuration Management</h2>
-          <Button type="button" onClick={onConfigsChanged} size="sm" variant="outline" className="border-slate-700">Refresh Configs</Button>
+          <Button type="button" onClick={onConfigsChanged} size="sm" variant="outline" className="border-slate-700">刷新配置</Button>
         </div>
         <Card className="bg-slate-900 border-slate-800">
-          <CardHeader><CardTitle className="text-white text-sm">Global System Settings & Flags</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-white text-sm">全局系统设置与开关</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            {configs.length ? configs.map((config) => <ConfigRow key={config.ID} config={config} onSaved={onConfigsChanged} />) : <p className="text-sm text-slate-500">No system configuration entries found.</p>}
+            {configs.length ? configs.map((config) => <ConfigRow key={config.ID} config={config} onSaved={onConfigsChanged} />) : <p className="text-sm text-slate-500">暂无系统配置项。</p>}
           </CardContent>
         </Card>
       </section>

@@ -108,6 +108,7 @@ export interface AuthNotice {
 export const API_PATHS = {
   stats: '/api/stats',
   login: '/api/auth/login',
+  me: '/api/auth/me',
   register: '/api/auth/register',
   verify: '/api/auth/verify',
   cards: '/api/card/list',
@@ -122,9 +123,9 @@ export const DEFAULT_CARD_NAME = 'My Aime Card'
 export const RANK_SUMMARY = ['SSS+', 'SSS', 'SS', 'S'] as const
 
 export const SETUP_STEPS = [
-  { title: 'Configure Hosts / DNS', body: 'Redirect ALL.Net domain requests to your MaiGoDX server IP address. For a local setup, this can be your loopback address.' },
-  { title: 'Boot Game Client', body: 'Start the game client and confirm that authorization completes against the local server instance.' },
-  { title: 'Access Portal', body: 'Sign in to review score data, inspect rating composition, bind Aime cards, and manage account settings.' },
+  { title: '配置 Hosts / DNS', body: '将 ALL.Net 域名请求指向 MaiGoDX 服务器 IP 地址。本地调试时可使用回环地址。' },
+  { title: '启动游戏客户端', body: '启动游戏客户端，并确认授权流程已在本地服务器实例上完成。' },
+  { title: '进入管理门户', body: '登录后可查看成绩数据、评级构成、绑定 Aime 卡片并管理账户设置。' },
 ] as const
 
 export const cardListPath = (email: string) => `${API_PATHS.cards}?email=${encodeURIComponent(email)}`

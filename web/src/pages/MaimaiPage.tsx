@@ -15,31 +15,31 @@ export function MaimaiPage({ stats }: MaimaiPageProps) {
     <div className="space-y-6">
       <Tabs defaultSelectedKey="recent" className="w-full">
         <TabsList className="bg-slate-900 border border-slate-800">
-          <TabsTrigger id="recent" className="data-[selected]:bg-indigo-600">Recent Plays</TabsTrigger>
-          <TabsTrigger id="stats" className="data-[selected]:bg-indigo-600">Statistics</TabsTrigger>
+          <TabsTrigger id="recent" className="data-[selected]:bg-indigo-600">最近游玩</TabsTrigger>
+          <TabsTrigger id="stats" className="data-[selected]:bg-indigo-600">成绩统计</TabsTrigger>
         </TabsList>
 
         <TabsContent id="recent" className="mt-6">
           <Card className="bg-slate-900 border-slate-800 overflow-hidden">
             <Table>
               <TableHeader className="bg-slate-800/50">
-                  <TableHead className="text-slate-300">Music</TableHead>
-                  <TableHead className="text-slate-300">Level</TableHead>
-                  <TableHead className="text-slate-300 text-right">Achievement</TableHead>
-                  <TableHead className="text-slate-300 text-right">Score</TableHead>
-                  <TableHead className="text-slate-300 text-right">Date</TableHead>
+                  <TableHead className="text-slate-300">乐曲</TableHead>
+                  <TableHead className="text-slate-300">难度</TableHead>
+                  <TableHead className="text-slate-300 text-right">达成率</TableHead>
+                  <TableHead className="text-slate-300 text-right">分数</TableHead>
+                  <TableHead className="text-slate-300 text-right">日期</TableHead>
               </TableHeader>
               <TableBody>
                 {plays.length ? plays.map((play) => (
                   <TableRow key={play.ID} className="border-slate-800 hover:bg-slate-800/30">
-                    <TableCell className="font-bold text-white">Song ID: {play.musicId}</TableCell>
+                    <TableCell className="font-bold text-white">乐曲 ID：{play.musicId}</TableCell>
                     <TableCell><Badge variant="outline" className="border-indigo-500/50 text-indigo-400">LV.{play.level}</Badge></TableCell>
                     <TableCell className="text-right font-mono text-emerald-400">{(play.achievement / 10000).toFixed(4)}%</TableCell>
                     <TableCell className="text-right font-mono">{play.score.toLocaleString()}</TableCell>
                     <TableCell className="text-right text-slate-500 text-xs">{play.createDate || '—'}</TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow><TableCell className="text-center py-12 text-slate-500">No play history found.</TableCell><TableCell /><TableCell /><TableCell /><TableCell /></TableRow>
+                  <TableRow><TableCell className="text-center py-12 text-slate-500">暂无游玩记录。</TableCell><TableCell /><TableCell /><TableCell /><TableCell /></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -51,7 +51,7 @@ export function MaimaiPage({ stats }: MaimaiPageProps) {
             {RANK_SUMMARY.map((rank) => (
               <Card key={rank} className="bg-slate-900 border-slate-800 text-center p-6">
                 <p className="text-2xl font-black text-indigo-400 mb-1">{rank}</p>
-                <p className="text-sm text-slate-500 font-bold">{stats?.rankCounts?.[rank] ?? 0} songs</p>
+                <p className="text-sm text-slate-500 font-bold">{stats?.rankCounts?.[rank] ?? 0} 首</p>
               </Card>
             ))}
           </div>

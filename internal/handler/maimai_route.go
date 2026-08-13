@@ -15,7 +15,7 @@ var maimaiAPINames = []string{
 	"GetUserCourseApi", "GetUserDataApi", "GetUserExtendApi", "GetUserFavoriteApi",
 	"GetUserFavoriteItemApi", "GetUserGhostApi", "GetUserIntimateApi", "GetUserItemApi",
 	"GetUserKaleidxScopeApi", "GetUserLoginBonusApi", "GetUserMapApi", "GetUserMusicApi",
-	"GetUserOptionApi", "GetUserPreviewApi", "GetUserRatingApi", "GetUserRecommendRateMusicApi",
+	"GetUserOptionApi", "GetUserPreviewApi", "GetUserRatingApi", "GetUserRecommendRateMusicApi", "GetUserRecommendSelectMusicApi",
 	"UploadUserPhotoApi", "UploadUserPlaylogApi", "UploadUserPlaylogListApi", "UpsertUserAllApi",
 	"UpsertUserPrintApi", "CMGetUserCharacterApi", "CMGetUserDataApi", "CMGetUserItemApi",
 	"CMGetUserPreviewApi", "CMUpsertUserPrintApi", "Ping", "RemoveTokenApi", "UserLoginApi", "UserLogoutApi",

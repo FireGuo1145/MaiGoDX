@@ -33,12 +33,12 @@ interface NavigationItem {
 }
 
 const navigation: NavigationItem[] = [
-  { id: 'home', label: 'Home', icon: Home },
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'home', label: '主页', icon: Home },
+  { id: 'dashboard', label: '概览', icon: LayoutDashboard },
   { id: 'maimai', label: 'maimai DX', icon: Gamepad2 },
-  { id: 'setup', label: 'Setup Guide', icon: Server },
-  { id: 'admin', label: 'Admin Panel', icon: Users, adminOnly: true },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'setup', label: '接入指南', icon: Server },
+  { id: 'admin', label: '管理后台', icon: Users, adminOnly: true },
+  { id: 'settings', label: '设置', icon: Settings },
 ]
 
 export function AppShell({
@@ -63,7 +63,7 @@ export function AppShell({
           </span>
           <button
             type="button"
-            aria-label="Toggle sidebar"
+            aria-label="切换侧边栏"
             onClick={onToggleSidebar}
             className="text-slate-400 hover:text-white transition-colors"
           >
@@ -101,7 +101,7 @@ export function AppShell({
             className="flex items-center gap-3 px-4 py-3 w-full text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
           >
             <LogOut size={20} />
-            <span className={`font-medium ${!isSidebarOpen ? 'hidden' : ''}`}>Logout</span>
+            <span className={`font-medium ${!isSidebarOpen ? 'hidden' : ''}`}>退出登录</span>
           </button>
         </div>
       </aside>

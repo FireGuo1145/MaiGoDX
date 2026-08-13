@@ -7,8 +7,8 @@ export function SetupPage() {
     <div className="max-w-3xl space-y-6">
       <Card className="bg-slate-900 border-slate-800">
         <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2"><BookOpen className="text-indigo-400" /> Connection & Setup Guide</CardTitle>
-          <CardDescription className="text-slate-400">Follow these instructions to connect an authorized game client to MaiGoDX.</CardDescription>
+          <CardTitle className="text-white flex items-center gap-2"><BookOpen className="text-indigo-400" /> 连接与接入指南</CardTitle>
+          <CardDescription className="text-slate-400">请按以下步骤将已授权的游戏客户端接入 MaiGoDX。</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-slate-300 leading-relaxed">
           {SETUP_STEPS.map((step, index) => (

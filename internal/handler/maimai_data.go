@@ -131,10 +131,14 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 	case "GetGameSetting":
 		return gameSettingPayload(), true, nil
 	case "GetGameEvent":
-		return map[string]interface{}{"type": 1, "gameEventList": []interface{}{}}, true, nil
+		return gameEventPayload(), true, nil
 	case "GetGameCharge":
-		return map[string]interface{}{"length": 0, "gameChargeList": []interface{}{}}, true, nil
-	case "GetUserGhost", "GetUserCard", "GetUserCharge", "GetUserFriendSeasonRanking", "GetUserFavoriteItem", "GetUserNewItemList", "GetUserRecommendRateMusic":
+		return gameChargePayload(), true, nil
+	case "GetUserRecommendRateMusic":
+		return recommendedMusicPayload(userID, "maimai_recommend_rate_music_ids", "userRecommendRateMusicIdList"), true, nil
+	case "GetUserRecommendSelectMusic":
+		return recommendedMusicPayload(userID, "maimai_recommend_select_music_ids", "userRecommendSelectionMusicIdList"), true, nil
+	case "GetUserGhost", "GetUserCard", "GetUserCharge", "GetUserFriendSeasonRanking", "GetUserFavoriteItem", "GetUserNewItemList":
 		return []interface{}{}, true, nil
 	case "GetUserCardPrintError":
 		return map[string]interface{}{"length": 0, "userPrintDetailList": []interface{}{}}, true, nil

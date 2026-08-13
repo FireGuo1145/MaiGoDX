@@ -14,6 +14,7 @@ import {
 export const api = {
   getStats: () => getJson<StatsResult>(API_PATHS.stats),
   login: (email: string, password: string) => postJson<LoginResult>(API_PATHS.login, { email, password }),
+  currentUser: () => getJson<LoginResult>(API_PATHS.me),
   register: (email: string, password: string, username: string) =>
     postJson<RegisterResult>(API_PATHS.register, { email, password, username }),
   verifyEmail: (email: string, token: string) => postJson<ApiResult>(API_PATHS.verify, { email, token }),
