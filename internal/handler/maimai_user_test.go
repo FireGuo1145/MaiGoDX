@@ -362,3 +362,34 @@ func TestGetUserFavoriteItemMatchesAquaDX(t *testing.T) {
 		}
 	}
 }
+
+func TestGetUserItemUsesAquaDXItemKindPaging(t *testing.T) {
+	setupMaimaiTestDB(t)
+	items := []model.UserItem{
+		{UserID: 88, ItemKind: 1, ItemID: 10, Stock: 1, IsValid: false},
+		{UserID: 88, ItemKind: 2, ItemID: 20, Stock: 2, IsValid: false},
+	}
+	if err := database.DB.Create(&items).Error; err != nil {
+		t.Fatalf("create items: %v", err)
+	}
+	for _, api := range []string{"GetUserItemApi", "CMGetUserItemApi"} {
+		t.Run(api, func(t *testing.T) {
+			body := `{"userId":88,"nextIndex":10000000000}`
+			req := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/"+api, strings.NewReader(body))
+			res := httptest.NewRecorder()
+			MaimaiHandler(res, req)
+			var payload map[string]interface{}
+			if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("decode item payload: %v", err)
+			}
+			list := payload["userItemList"].([]interface{})
+			if payload["itemKind"] != float64(1) || payload["nextIndex"] != float64(0) || len(list) != 1 {
+				t.Fatalf("item payload=%v", payload)
+			}
+			item := list[0].(map[string]interface{})
+			if item["itemId"] != float64(10) || item["isValid"] != true {
+				t.Fatalf("item=%v", item)
+			}
+		})
+	}
+}

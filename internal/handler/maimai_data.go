@@ -77,9 +77,14 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 		}
 		return map[string]interface{}{"userId": userID, "userCharacterList": values}, true, nil
 	case "GetUserItem", "CMGetUserItem":
+		nextIndex := requestInt64(body, "nextIndex")
+		itemKind := int(nextIndex / 10_000_000_000)
 		var values []model.UserItem
-		database.DB.Where("user_id = ?", userID).Find(&values)
-		return map[string]interface{}{"userId": userID, "userItemList": values}, true, nil
+		database.DB.Where("user_id = ? AND item_kind = ?", userID, itemKind).Order("item_id asc").Find(&values)
+		for index := range values {
+			values[index].IsValid = true
+		}
+		return map[string]interface{}{"userId": userID, "nextIndex": 0, "itemKind": itemKind, "userItemList": values}, true, nil
 	case "GetUserLoginBonus":
 		var values []model.UserLoginBonus
 		database.DB.Where("user_id = ?", userID).Find(&values)
