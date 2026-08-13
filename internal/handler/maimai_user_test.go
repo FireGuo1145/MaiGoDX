@@ -28,7 +28,7 @@ func setupMaimaiTestDB(t *testing.T) {
 	if err := db.AutoMigrate(
 		&model.SystemConfig{}, &model.UserCard{}, &model.UserDetail{}, &model.UserOption{}, &model.UserExtend{}, &model.UserPlaylog{},
 		&model.UserCharacter{}, &model.UserItem{}, &model.UserMap{}, &model.UserFavorite{},
-		&model.UserMusicDetail{}, &model.UserCourse{}, &model.UserLoginBonus{}, &model.UserGeneralData{},
+		&model.UserMusicDetail{}, &model.UserCharge{}, &model.UserFriendSeasonRanking{}, &model.UserCourse{}, &model.UserLoginBonus{}, &model.UserGeneralData{},
 		&model.UserUdemae{}, &model.UserKaleidx{}, &model.UserIntimate{}, &model.UserActivity{}, &model.UserRegion{},
 		&model.UserGameCard{}, &model.UserPrintDetail{}, &model.GameSellingCard{},
 	); err != nil {
@@ -444,5 +444,38 @@ func TestGetGameRankingMatchesAquaDXMusicRanking(t *testing.T) {
 	}
 	if len(nonMusic["gameRankingList"].([]interface{})) != 0 {
 		t.Fatalf("non-music ranking=%v", nonMusic)
+	}
+}
+
+func TestUpsertAndReadChargeAndFriendSeasonRanking(t *testing.T) {
+	setupMaimaiTestDB(t)
+	req := model.UpsertUserAllRequest{UserID: 902}
+	req.UpsertUserAll.UserData = []model.UserDetail{{UserName: "ChargeUser"}}
+	req.UpsertUserAll.UserChargeList = []model.UserCharge{{ChargeID: 8, Stock: 3, PurchaseDate: "2026-08-13 00:00:00.0", ValidDate: "2026-09-13 00:00:00.0"}}
+	req.UpsertUserAll.UserFriendSeasonRankingList = []model.UserFriendSeasonRanking{{SeasonID: 2, Point: 45, Rank: 6, RewardGet: true, UserName: "Friend", RecordDate: "2026-08-13 00:00:00.0"}}
+	if err := UpsertUserAll(req); err != nil {
+		t.Fatalf("upsert charge/ranking: %v", err)
+	}
+
+	for _, test := range []struct {
+		api  string
+		key  string
+		want float64
+	}{
+		{"GetUserChargeApi", "chargeId", 8},
+		{"GetUserFriendSeasonRankingApi", "seasonId", 2},
+	} {
+		t.Run(test.api, func(t *testing.T) {
+			httpReq := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/"+test.api, strings.NewReader(`{"userId":902}`))
+			res := httptest.NewRecorder()
+			MaimaiHandler(res, httpReq)
+			var values []map[string]interface{}
+			if err := json.Unmarshal(res.Body.Bytes(), &values); err != nil {
+				t.Fatalf("decode %s: %v body=%s", test.api, err, res.Body.String())
+			}
+			if len(values) != 1 || values[0][test.key] != test.want || values[0]["userId"] != float64(902) {
+				t.Fatalf("%s values=%v", test.api, values)
+			}
+		})
 	}
 }

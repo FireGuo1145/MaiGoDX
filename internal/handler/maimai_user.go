@@ -91,6 +91,18 @@ func UpsertUserAll(req model.UpsertUserAllRequest) error {
 				return err
 			}
 		}
+		for _, value := range latestCharges(req.UpsertUserAll.UserChargeList) {
+			value.ID, value.UserID = 0, req.UserID
+			if err := saveCharge(tx, &value); err != nil {
+				return err
+			}
+		}
+		for _, value := range latestFriendSeasonRankings(req.UpsertUserAll.UserFriendSeasonRankingList) {
+			value.ID, value.UserID = 0, req.UserID
+			if err := saveFriendSeasonRanking(tx, &value); err != nil {
+				return err
+			}
+		}
 		for _, value := range latestFavorites(req.UpsertUserAll.UserFavoriteList) {
 			value.ID, value.UserID = 0, req.UserID
 			if err := saveFavorite(tx, &value); err != nil {
@@ -272,6 +284,26 @@ func saveCourse(tx *gorm.DB, value *model.UserCourse) error {
 	}
 	return tx.Save(value).Error
 }
+func saveCharge(tx *gorm.DB, value *model.UserCharge) error {
+	var x model.UserCharge
+	if err := tx.Where("user_id = ? AND charge_id = ?", value.UserID, value.ChargeID).First(&x).Error; err == nil {
+		value.ID = x.ID
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	return tx.Save(value).Error
+}
+
+func saveFriendSeasonRanking(tx *gorm.DB, value *model.UserFriendSeasonRanking) error {
+	var x model.UserFriendSeasonRanking
+	if err := tx.Where("user_id = ? AND season_id = ?", value.UserID, value.SeasonID).First(&x).Error; err == nil {
+		value.ID = x.ID
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	return tx.Save(value).Error
+}
+
 func saveFavorite(tx *gorm.DB, value *model.UserFavorite) error {
 	var x model.UserFavorite
 	if err := tx.Where("user_id = ? AND item_kind = ?", value.UserID, value.ItemKind).First(&x).Error; err == nil {
@@ -373,6 +405,30 @@ func latestMusicDetails(values []model.UserMusicDetail) []model.UserMusicDetail 
 	}
 	return out
 }
+func latestCharges(values []model.UserCharge) []model.UserCharge {
+	m := map[int]model.UserCharge{}
+	for _, value := range values {
+		m[value.ChargeID] = value
+	}
+	out := make([]model.UserCharge, 0, len(m))
+	for _, value := range m {
+		out = append(out, value)
+	}
+	return out
+}
+
+func latestFriendSeasonRankings(values []model.UserFriendSeasonRanking) []model.UserFriendSeasonRanking {
+	m := map[int]model.UserFriendSeasonRanking{}
+	for _, value := range values {
+		m[value.SeasonID] = value
+	}
+	out := make([]model.UserFriendSeasonRanking, 0, len(m))
+	for _, value := range m {
+		out = append(out, value)
+	}
+	return out
+}
+
 func latestCourses(values []model.UserCourse) []model.UserCourse {
 	m := map[int]model.UserCourse{}
 	for _, v := range values {

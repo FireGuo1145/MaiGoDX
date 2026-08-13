@@ -297,6 +297,27 @@ type UserMusicDetail struct {
 	ExtNum1       int   `json:"extNum1"`
 }
 
+type UserCharge struct {
+	gorm.Model   `json:"-"`
+	UserID       int64  `gorm:"uniqueIndex:idx_user_charge;not null" json:"userId"`
+	ChargeID     int    `gorm:"uniqueIndex:idx_user_charge;not null" json:"chargeId"`
+	Stock        int    `json:"stock"`
+	PurchaseDate string `json:"purchaseDate"`
+	ValidDate    string `json:"validDate"`
+}
+
+// UserFriendSeasonRanking persists a player's seasonal friend ranking state.
+type UserFriendSeasonRanking struct {
+	gorm.Model `json:"-"`
+	UserID     int64  `gorm:"uniqueIndex:idx_user_friend_season;not null" json:"userId"`
+	SeasonID   int    `gorm:"uniqueIndex:idx_user_friend_season;not null" json:"seasonId"`
+	Point      int    `json:"point"`
+	Rank       int    `json:"rank"`
+	RewardGet  bool   `json:"rewardGet"`
+	UserName   string `json:"userName"`
+	RecordDate string `json:"recordDate"`
+}
+
 type UserCourse struct {
 	gorm.Model          `json:"-"`
 	UserID              int64  `gorm:"uniqueIndex:idx_user_course;not null" json:"userId"`
@@ -465,16 +486,19 @@ type UserFavoriteMusic struct {
 type UpsertUserAllRequest struct {
 	UserID        int64 `json:"userId"`
 	UpsertUserAll struct {
-		UserData               []UserDetail          `json:"userData"`
-		UserOption             []UserOption          `json:"userOption"`
-		UserExtend             []UserExtend          `json:"userExtend"`
-		UserCharacterList      []UserCharacter       `json:"userCharacterList"`
-		UserMapList            []UserMap             `json:"userMapList"`
-		UserLoginBonusList     []UserLoginBonus      `json:"userLoginBonusList"`
-		UserRatingList         []UserRatingPayload   `json:"userRatingList"`
-		UserItemList           []UserItem            `json:"userItemList"`
-		UserMusicDetailList    []UserMusicDetail     `json:"userMusicDetailList"`
-		UserCourseList         []UserCourse          `json:"userCourseList"`
+		UserData                    []UserDetail              `json:"userData"`
+		UserOption                  []UserOption              `json:"userOption"`
+		UserExtend                  []UserExtend              `json:"userExtend"`
+		UserCharacterList           []UserCharacter           `json:"userCharacterList"`
+		UserMapList                 []UserMap                 `json:"userMapList"`
+		UserLoginBonusList          []UserLoginBonus          `json:"userLoginBonusList"`
+		UserRatingList              []UserRatingPayload       `json:"userRatingList"`
+		UserItemList                []UserItem                `json:"userItemList"`
+		UserMusicDetailList         []UserMusicDetail         `json:"userMusicDetailList"`
+		UserCourseList              []UserCourse              `json:"userCourseList"`
+		UserChargeList              []UserCharge              `json:"userChargeList"`
+		UserFriendSeasonRankingList []UserFriendSeasonRanking `json:"userFriendSeasonRankingList"`
+
 		UserFavoriteList       []UserFavorite        `json:"userFavoriteList"`
 		UserActivityList       []UserActivityPayload `json:"userActivityList"`
 		UserFavoriteMusicList  []UserFavoriteMusic   `json:"userFavoritemusicList"`

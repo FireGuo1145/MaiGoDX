@@ -237,7 +237,15 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 		var cards []model.UserGameCard
 		database.DB.Where("user_id = ?", userID).Order("card_id asc").Find(&cards)
 		return cards, true, nil
-	case "GetUserGhost", "GetUserCharge", "GetUserFriendSeasonRanking":
+	case "GetUserCharge":
+		var charges []model.UserCharge
+		database.DB.Where("user_id = ?", userID).Order("charge_id asc").Find(&charges)
+		return charges, true, nil
+	case "GetUserFriendSeasonRanking":
+		var rankings []model.UserFriendSeasonRanking
+		database.DB.Where("user_id = ?", userID).Order("season_id asc").Find(&rankings)
+		return rankings, true, nil
+	case "GetUserGhost":
 		return []interface{}{}, true, nil
 	case "GetUserCardPrintError", "CMGetUserCardPrintError":
 		return map[string]interface{}{"length": 0, "userPrintDetailList": []interface{}{}}, true, nil
