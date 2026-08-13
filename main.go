@@ -85,8 +85,8 @@ func main() {
 		fileServer.ServeHTTP(w, r)
 	})
 
-	// 使用压缩中间件
-	handlerWithMiddleware := middleware.CompressionMiddleware(mux)
+	// 压缩始终启用；开发模式下额外输出全量 HTTP 访问日志。
+	handlerWithMiddleware := middleware.AccessLogMiddleware(middleware.CompressionMiddleware(mux))
 	var port string = os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
