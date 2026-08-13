@@ -338,3 +338,27 @@ func TestGetUserCardAndCMGetUserCardReturnPersistedCards(t *testing.T) {
 		})
 	}
 }
+
+func TestGetUserFavoriteItemMatchesAquaDX(t *testing.T) {
+	setupMaimaiTestDB(t)
+	if err := database.DB.Create(&model.UserGeneralData{UserID: 66, PropertyKey: "favorite_music", PropertyValue: "12,34,56"}).Error; err != nil {
+		t.Fatalf("create favorites: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/GetUserFavoriteItemApi", strings.NewReader(`{"userId":66,"kind":1}`))
+	res := httptest.NewRecorder()
+	MaimaiHandler(res, req)
+	var payload map[string]interface{}
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode favorites: %v", err)
+	}
+	items, ok := payload["userFavoriteItemList"].([]interface{})
+	if !ok || len(items) != 3 || payload["length"] != float64(3) || payload["nextIndex"] != float64(0) {
+		t.Fatalf("favorite response=%v", payload)
+	}
+	for index, want := range []float64{12, 34, 56} {
+		item := items[index].(map[string]interface{})
+		if item["id"] != want || item["orderId"] != float64(index) {
+			t.Fatalf("favorite item %d=%v", index, item)
+		}
+	}
+}

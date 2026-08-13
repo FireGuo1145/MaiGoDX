@@ -186,11 +186,31 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 		return recommendedMusicPayload(userID, "maimai_recommend_rate_music_ids", "userRecommendRateMusicIdList"), true, nil
 	case "GetUserRecommendSelectMusic":
 		return recommendedMusicPayload(userID, "maimai_recommend_select_music_ids", "userRecommendSelectionMusicIdList"), true, nil
+	case "GetUserFavoriteItem":
+		kind := requestInt(body, "kind")
+		propertyKey := ""
+		if kind == 1 {
+			propertyKey = "favorite_music"
+		} else if kind == 2 {
+			propertyKey = "favorite_rival"
+		}
+		items := make([]map[string]int, 0)
+		if propertyKey != "" {
+			var favorite model.UserGeneralData
+			if err := database.DB.Where("user_id = ? AND property_key = ?", userID, propertyKey).First(&favorite).Error; err == nil {
+				for orderID, record := range strings.Split(favorite.PropertyValue, ",") {
+					if itemID, err := strconv.Atoi(strings.TrimSpace(record)); err == nil {
+						items = append(items, map[string]int{"id": itemID, "orderId": orderID})
+					}
+				}
+			}
+		}
+		return map[string]interface{}{"userId": userID, "kind": kind, "length": len(items), "nextIndex": 0, "userFavoriteItemList": items}, true, nil
 	case "GetUserCard", "CMGetUserCard":
 		var cards []model.UserGameCard
 		database.DB.Where("user_id = ?", userID).Order("card_id asc").Find(&cards)
 		return cards, true, nil
-	case "GetUserGhost", "GetUserCharge", "GetUserFriendSeasonRanking", "GetUserFavoriteItem":
+	case "GetUserGhost", "GetUserCharge", "GetUserFriendSeasonRanking":
 		return []interface{}{}, true, nil
 	case "GetUserCardPrintError", "CMGetUserCardPrintError":
 		return map[string]interface{}{"length": 0, "userPrintDetailList": []interface{}{}}, true, nil
