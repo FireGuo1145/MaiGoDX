@@ -90,7 +90,7 @@ func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 	}
 	uri := uriBase + "/" + gameID + "/" + version + "/"
 	fields := aquaPowerOnFields(uri, base, request["token"], request["format_ver"])
-	log.Printf("[MaiGoDX] ALL.Net PowerOn accepted: keychip=%s terminal=%d game=%s version=%s route=%s session=%s remote=%s", terminal.KeychipID, terminal.ID, gameID, version, routeMode, sessionLog, clientIP(r))
+	log.Printf("[MaiGoDX] ALL.Net PowerOn accepted: keychip=%s terminal=%d game=%s version=%s route=%s session=%s uri=%s remote=%s", terminal.KeychipID, terminal.ID, gameID, version, routeMode, sessionLog, uri, clientIP(r))
 	// AquaDX returns a plain URL-formatted response with a trailing newline.
 	// KanadeDX parses this with Split('&') and Split('='), so compressed DFI
 	// output or missing base fields causes its PowerOn parser to fail.
