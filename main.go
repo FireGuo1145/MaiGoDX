@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
@@ -28,11 +29,17 @@ func main() {
 	mux.HandleFunc("/api/auth/logout", handler.HandleLogout)
 	mux.HandleFunc("/api/auth/verify", handler.HandleVerifyEmail)
 	mux.HandleFunc("/api/admin/users", handler.HandleAdminUsers)
+	mux.HandleFunc("/api/admin/terminals", handler.HandleAdminTerminals)
+	mux.HandleFunc("/api/admin/terminal/create", handler.HandleCreateTerminal)
+	mux.HandleFunc("/api/admin/terminal/update", handler.HandleUpdateTerminal)
+	mux.HandleFunc("/api/admin/terminal/delete", handler.HandleDeleteTerminal)
 	mux.HandleFunc("/api/admin/config/get", handler.HandleGetConfigs)
 	mux.HandleFunc("/api/admin/config/update", handler.HandleUpdateConfig)
 	mux.HandleFunc("/api/card/bind", handler.HandleBindCard)
 	mux.HandleFunc("/api/card/list", handler.HandleGetUserCards)
 	mux.HandleFunc("/api/stats", handler.HandleGetStats)
+	mux.HandleFunc("/sys/servlet/PowerOn", handler.HandleAllNetPowerOn)
+	mux.HandleFunc("/gs/", handler.HandleTerminalMaimai)
 
 	// 托管前端静态资源
 	subFS, err := fs.Sub(distFS, "web/dist")
@@ -64,13 +71,17 @@ func main() {
 
 	// 使用压缩中间件
 	handlerWithMiddleware := middleware.CompressionMiddleware(mux)
+	var port string = os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 
 	log.Println("==================================================")
 	log.Println("  MaiGoDX Server (Go-based Maimai DX Server)      ")
-	log.Println("  Running on :8080 ...                            ")
+	log.Println("  Running on :" + port + " ...                            ")
 	log.Println("==================================================")
 
-	if err := http.ListenAndServe(":8080", handlerWithMiddleware); err != nil {
+	if err := http.ListenAndServe(":"+port, handlerWithMiddleware); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 }

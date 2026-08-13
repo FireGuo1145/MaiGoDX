@@ -9,7 +9,7 @@ import { HomePage } from '@/pages/HomePage'
 import { MaimaiPage } from '@/pages/MaimaiPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { SetupPage } from '@/pages/SetupPage'
-import type { LoginResult, PageId, Stats, SystemConfig, UserAccount, UserCard } from '@/types'
+import type { LoginResult, PageId, Stats, SystemConfig, Terminal, UserAccount, UserCard } from '@/types'
 import { apiErrorMessage } from '@/types'
 
 const pagePaths: Record<PageId, string> = {
@@ -44,6 +44,7 @@ export default function App() {
   const [cards, setCards] = useState<UserCard[]>([])
   const [users, setUsers] = useState<UserAccount[]>([])
   const [configs, setConfigs] = useState<SystemConfig[]>([])
+  const [terminals, setTerminals] = useState<Terminal[]>([])
   const location = useLocation()
   const navigate = useNavigate()
   const page = pageFromPath(location.pathname)
@@ -90,6 +91,15 @@ export default function App() {
     }
   }
 
+  const refreshTerminals = async () => {
+    try {
+      const result = await api.getTerminals()
+      if (result.success) setTerminals(result.terminals || [])
+    } catch (error) {
+      console.error('加载机台列表失败：', apiErrorMessage(error))
+    }
+  }
+
   const refreshConfigs = async () => {
     try {
       const result = await api.getConfigs()
@@ -106,6 +116,7 @@ export default function App() {
     if (user.isAdmin) {
       void refreshUsers()
       void refreshConfigs()
+      void refreshTerminals()
     }
   }, [user])
 
@@ -116,6 +127,7 @@ export default function App() {
     setCards([])
     setUsers([])
     setConfigs([])
+    setTerminals([])
     navigate('/', { replace: true })
   }
 
@@ -145,7 +157,7 @@ export default function App() {
         <Route
           path="/admin"
           element={user.isAdmin
-            ? <AdminPage users={users} configs={configs} onUsersChanged={refreshUsers} onConfigsChanged={refreshConfigs} />
+            ? <AdminPage users={users} configs={configs} terminals={terminals} onUsersChanged={refreshUsers} onConfigsChanged={refreshConfigs} onTerminalsChanged={refreshTerminals} />
             : <Navigate to="/" replace />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />

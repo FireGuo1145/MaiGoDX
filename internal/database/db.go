@@ -58,6 +58,8 @@ func InitDB() {
 		&model.SystemConfig{},
 		&model.GameEvent{},
 		&model.GameCharge{},
+		&model.Terminal{},
+		&model.TerminalSession{},
 		&model.UserDetail{},
 		&model.UserOption{},
 		&model.UserExtend{},

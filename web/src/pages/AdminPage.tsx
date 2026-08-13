@@ -6,14 +6,17 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import api from '@/lib/api'
-import type { SystemConfig, UserAccount } from '@/types'
+import type { SystemConfig, Terminal, UserAccount } from '@/types'
+import { TerminalPanel } from '@/components/admin/TerminalPanel'
 import { apiErrorMessage, initialOf, isTruthyConfig } from '@/types'
 
 interface AdminPageProps {
   users: UserAccount[]
   configs: SystemConfig[]
+  terminals: Terminal[]
   onUsersChanged: () => Promise<void>
   onConfigsChanged: () => Promise<void>
+  onTerminalsChanged: () => Promise<void>
 }
 
 function ConfigRow({ config, onSaved }: { config: SystemConfig; onSaved: () => Promise<void> }) {
@@ -55,7 +58,7 @@ function ConfigRow({ config, onSaved }: { config: SystemConfig; onSaved: () => P
   )
 }
 
-export function AdminPage({ users, configs, onUsersChanged, onConfigsChanged }: AdminPageProps) {
+export function AdminPage({ users, configs, terminals, onUsersChanged, onConfigsChanged, onTerminalsChanged }: AdminPageProps) {
   return (
     <div className="space-y-8">
       <section className="space-y-6">
@@ -88,6 +91,7 @@ export function AdminPage({ users, configs, onUsersChanged, onConfigsChanged }: 
         </Card>
       </section>
 
+      <TerminalPanel terminals={terminals} onChanged={onTerminalsChanged} />
       <section className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-bold flex items-center gap-2"><Sliders /> Server Configuration Management</h2>

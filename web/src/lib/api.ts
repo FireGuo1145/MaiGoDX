@@ -9,6 +9,8 @@ import {
   type RegisterResult,
   type StatsResult,
   type UsersResult,
+  type Terminal,
+  type TerminalsResult,
 } from '@/types'
 
 export const api = {
@@ -23,6 +25,10 @@ export const api = {
   bindCard: (email: string, accessCode: string, cardName: string, gameUserId?: number) =>
     postJson<ApiResult>(API_PATHS.bindCard, { email, accessCode, cardName, gameUserId }),
   getUsers: () => getJson<UsersResult>(API_PATHS.users),
+  getTerminals: () => getJson<TerminalsResult>(API_PATHS.terminals),
+  createTerminal: (terminal: Pick<Terminal, "keychipId" | "name" | "gameId" | "gameVersion">) => postJson<ApiResult>(API_PATHS.createTerminal, terminal),
+  updateTerminal: (terminal: Terminal) => postJson<ApiResult>(API_PATHS.updateTerminal, terminal),
+  deleteTerminal: (id: number) => postJson<ApiResult>(API_PATHS.deleteTerminal, { id }),
   getConfigs: () => getJson<ConfigsResult>(API_PATHS.configs),
   updateConfig: (key: string, value: string) => postJson<ApiResult>(API_PATHS.updateConfig, { key, value }),
 }

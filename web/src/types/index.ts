@@ -23,6 +23,18 @@ export interface SystemConfig {
   desc: string
 }
 
+export interface Terminal {
+  ID: number
+  keychipId: string
+  name: string
+  gameId: string
+  gameVersion: string
+  ownerAccountId: number
+  isEnabled: boolean
+  lastSeenAt: string
+  lastSeenIp: string
+}
+
 export interface Playlog {
   ID: number
   musicId: number
@@ -98,6 +110,9 @@ export interface ConfigsResult extends ApiResult {
   configs: SystemConfig[]
 }
 
+export interface TerminalsResult extends ApiResult {
+  terminals: Terminal[]
+}
 export interface StatsResult extends ApiResult, Stats {}
 
 export interface AuthNotice {
@@ -114,6 +129,10 @@ export const API_PATHS = {
   cards: '/api/card/list',
   bindCard: '/api/card/bind',
   users: '/api/admin/users',
+  terminals: '/api/admin/terminals',
+  createTerminal: '/api/admin/terminal/create',
+  updateTerminal: '/api/admin/terminal/update',
+  deleteTerminal: '/api/admin/terminal/delete',
   configs: '/api/admin/config/get',
   updateConfig: '/api/admin/config/update',
 } as const
