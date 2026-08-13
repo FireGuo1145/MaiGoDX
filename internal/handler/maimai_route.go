@@ -15,8 +15,8 @@ var maimaiAPINames = []string{
 	"GetUserCircleChallengeApi", "GetUserCircleDataApi", "GetUserCirclePointDataApi", "GetUserCirclePointRankingApi", "GetUserCourseApi", "GetUserDataApi", "GetUserExtendApi", "GetUserFavoriteApi",
 	"GetUserFavoriteItemApi", "GetUserFestaApi", "GetUserFriendBonusApi", "GetUserFriendCheckApi", "GetUserGhostApi", "GetUserIntimateApi", "GetUserItemApi",
 	"GetUserKaleidxScopeApi", "GetUserLoginBonusApi", "GetUserMapApi", "GetUserMissionDataApi", "GetUserMusicApi", "GetUserNewItemApi", "GetUserNewItemListApi",
-	"GetUserOptionApi", "GetUserPreviewApi", "GetUserRatingApi", "GetUserRecommendRateMusicApi", "GetUserRecommendSelectMusicApi", "GetUserRegionApi", "GetUserRivalDataApi", "GetUserRivalMusicApi", "GetUserScoreRankingApi", "GetUserShopStockApi",
-	"UploadUserPhotoApi", "UploadUserPlaylogApi", "UploadUserPlaylogListApi", "UpsertUserAllApi", "UpsertUserChargelogApi",
+	"GetUserOptionApi", "GetUserPortraitApi", "GetUserPreviewApi", "GetUserRatingApi", "GetUserRecommendRateMusicApi", "GetUserRecommendSelectMusicApi", "GetUserRegionApi", "GetUserRivalDataApi", "GetUserRivalMusicApi", "GetUserScoreRankingApi", "GetUserShopStockApi",
+	"UploadUserPhotoApi", "UploadUserPlaylogApi", "UploadUserPlaylogListApi", "UploadUserPortraitApi", "UpsertUserAllApi", "UpsertUserChargelogApi",
 	"UpsertUserPlaceCircleRegistApi", "UpsertUserPrintApi", "UpsertClientBookkeepingApi", "UpsertClientPlayTimeApi", "UpsertClientSettingApi", "UpsertClientTestmodeApi", "UpsertClientUploadApi",
 	"CMGetSellingCardApi", "CMGetUserCharacterApi", "CMGetUserDataApi", "CMGetUserItemApi", "CMGetUserPreviewApi", "CMLoginApi", "CMLogoutApi", "CMUpsertBuyCardApi", "CMUpsertUserPrintApi", "CMUpsertUserPrintlogApi", "CreateTokenApi", "GetTransferFriendApi", "Ping", "RemoveTokenApi", "UserFriendRegistApi", "UserLoginApi", "UserLogoutApi",
 }

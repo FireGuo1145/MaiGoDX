@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -256,5 +259,61 @@ func TestCMPreviewAndKaleidxMatchAquaDX(t *testing.T) {
 		if gate["gateId"] != float64(index+1) || gate["isGateFound"] != true || gate["isKeyFound"] != true {
 			t.Fatalf("unexpected Kaleidx gate %d: %v", index+1, gate)
 		}
+	}
+}
+
+func TestPhotoAndPortraitChunkEndpointsMatchAquaDX(t *testing.T) {
+	setupMaimaiTestDB(t)
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	tempDir := t.TempDir()
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("change to temporary directory: %v", err)
+	}
+	defer func() { _ = os.Chdir(originalDir) }()
+
+	chunk1 := base64.StdEncoding.EncodeToString([]byte("first-"))
+	chunk2 := base64.StdEncoding.EncodeToString([]byte("second"))
+	for index, encoded := range []string{chunk1, chunk2} {
+		body := fmt.Sprintf(`{"userPhoto":{"userId":9,"trackNo":2,"divNumber":%d,"divLength":2,"divData":%q}}`, index, encoded)
+		req := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/UploadUserPhotoApi", strings.NewReader(body))
+		res := httptest.NewRecorder()
+		MaimaiHandler(res, req)
+		if res.Code != http.StatusOK {
+			t.Fatalf("photo upload part %d status=%d", index, res.Code)
+		}
+	}
+	matches, err := filepath.Glob(filepath.Join("data", "upload", "mai2", "plays", "9-*.jpg"))
+	if err != nil || len(matches) != 1 {
+		t.Fatalf("assembled score photo=%v err=%v", matches, err)
+	}
+	assembled, err := os.ReadFile(matches[0])
+	if err != nil || string(assembled) != "first-second" {
+		t.Fatalf("assembled score photo=%q err=%v", assembled, err)
+	}
+
+	portrait := base64.StdEncoding.EncodeToString([]byte("portrait-image"))
+	portraitReq := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/UploadUserPortraitApi", strings.NewReader(fmt.Sprintf(`{"userPortrait":{"userId":9,"divNumber":0,"divLength":1,"divData":%q}}`, portrait)))
+	portraitRes := httptest.NewRecorder()
+	MaimaiHandler(portraitRes, portraitReq)
+	if portraitRes.Code != http.StatusOK {
+		t.Fatalf("portrait upload status=%d", portraitRes.Code)
+	}
+	getReq := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/GetUserPortraitApi", strings.NewReader(`{"userId":9}`))
+	getRes := httptest.NewRecorder()
+	MaimaiHandler(getRes, getReq)
+	var getPayload map[string]interface{}
+	if err := json.Unmarshal(getRes.Body.Bytes(), &getPayload); err != nil {
+		t.Fatalf("decode portrait response: %v", err)
+	}
+	if getPayload["length"] != float64(1) {
+		t.Fatalf("portrait response=%v", getPayload)
+	}
+	list := getPayload["userPortraitList"].([]interface{})
+	entry := list[0].(map[string]interface{})
+	if entry["divData"] != portrait || entry["divNumber"] != float64(0) || entry["divLength"] != float64(1) {
+		t.Fatalf("portrait chunk=%v", entry)
 	}
 }

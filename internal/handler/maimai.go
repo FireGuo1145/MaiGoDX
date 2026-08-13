@@ -53,6 +53,10 @@ func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 		r.Body = io.NopCloser(bytes.NewReader(body))
 		HandleUploadUserPhoto(w, r, apiName)
 		return
+	case "UploadUserPortrait":
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		HandleUploadUserPortrait(w, r, apiName)
+		return
 	case "UpsertUserPrint":
 		r.Body = io.NopCloser(bytes.NewReader(body))
 		HandleUpsertUserPrint(w, r, apiName)
@@ -79,6 +83,11 @@ func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 	userID := requestUserID(body)
 	if userID == 0 {
 		writeGameResponse(w, apiName, 0, nil, "missing userId")
+		return
+	}
+
+	if apiName == "GetUserPortrait" {
+		HandleGetUserPortrait(w, r, apiName, userID)
 		return
 	}
 
