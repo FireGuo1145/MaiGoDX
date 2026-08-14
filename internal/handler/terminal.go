@@ -20,6 +20,21 @@ import (
 
 const terminalSessionTTL = 48 * time.Hour
 
+// HandleAllNetSelfTest implements AquaDX's plain ALL.Net health-check
+// endpoint. Cabinets expect this exact text rather than the web UI fallback.
+func HandleAllNetSelfTest(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = io.WriteString(w, "Server running")
+}
+
+// HandleNaomiTest implements the Naomi title-server connectivity check. If it
+// falls through to the SPA handler, a cabinet receives HTML and marks the
+// title server as bad even though PowerOn itself succeeded.
+func HandleNaomiTest(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = io.WriteString(w, "naomi ok")
+}
+
 // HandleAllNetPowerOn authenticates a cabinet Keychip and returns its game URL.
 func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 	payload, err := io.ReadAll(r.Body)
@@ -153,6 +168,12 @@ func allNetKeychipPermissive() bool {
 func allNetPublicHost(r *http.Request) string {
 	if configured := strings.TrimSpace(maimaiConfigValue("allnet_public_host", "")); configured != "" {
 		return configured
+	}
+	// AquaDX gives this header precedence. It is supplied by an ALL.Net proxy
+	// when the Host header points at the proxy rather than the cabinet-reachable
+	// game server address.
+	if forwarded := strings.TrimSpace(r.Header.Get("AllNet-Forwarded-From")); forwarded != "" {
+		return forwarded
 	}
 	return forwardedHost(r)
 }
