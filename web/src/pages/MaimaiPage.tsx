@@ -10,6 +10,9 @@ interface MaimaiPageProps {
 
 export function MaimaiPage({ stats }: MaimaiPageProps) {
   const plays = stats?.recentPlays || []
+  const travelPartners = stats?.travelPartners || []
+  const functionTickets = stats?.functionTickets || []
+  const regions = stats?.regions || []
 
   return (
     <div className="space-y-6">
@@ -17,6 +20,7 @@ export function MaimaiPage({ stats }: MaimaiPageProps) {
         <TabsList className="bg-slate-900 border border-slate-800">
           <TabsTrigger id="recent" className="data-[selected]:bg-indigo-600">最近游玩</TabsTrigger>
           <TabsTrigger id="stats" className="data-[selected]:bg-indigo-600">成绩统计</TabsTrigger>
+          <TabsTrigger id="profile" className="data-[selected]:bg-indigo-600">游戏档案</TabsTrigger>
         </TabsList>
 
         <TabsContent id="recent" className="mt-6">
@@ -56,7 +60,74 @@ export function MaimaiPage({ stats }: MaimaiPageProps) {
             ))}
           </div>
         </TabsContent>
+
+        <TabsContent id="profile" className="mt-6 space-y-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Card className="border-slate-800 bg-slate-900 p-5">
+              <p className="text-sm font-medium text-slate-400">当前搭档</p>
+              <p className="mt-2 text-3xl font-black text-indigo-400">
+                {stats?.partner?.partnerId ? `ID ${stats.partner.partnerId}` : '未装备'}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">来自机台同步的 partnerId。</p>
+            </Card>
+            <Card className="border-slate-800 bg-slate-900 p-5">
+              <p className="text-sm font-medium text-slate-400">功能票库存</p>
+              <p className="mt-2 text-3xl font-black text-emerald-400">{functionTickets.reduce((total, ticket) => total + ticket.stock, 0)}</p>
+              <p className="mt-2 text-xs text-slate-500">共 {functionTickets.length} 种功能票。</p>
+            </Card>
+          </div>
+
+          <ProfileTable
+            title="旅行伙伴"
+            empty="尚无旅行伙伴数据。完成机台同步后会显示在这里。"
+            headers={['搭档 ID', '亲密度等级', '已领奖励次数']}
+            rows={travelPartners.map((partner) => [partner.partnerId, partner.intimateLevel, partner.intimateCountRewarded])}
+          />
+          <ProfileTable
+            title="功能票"
+            empty="尚未持有功能票。"
+            headers={['票种 ID', '库存']}
+            rows={functionTickets.map((ticket) => [ticket.itemId, ticket.stock])}
+          />
+          <ProfileTable
+            title="区域游玩记录"
+            empty="尚无区域游玩记录。"
+            headers={['区域 ID', '游玩次数']}
+            rows={regions.map((region) => [region.regionId, region.playCount])}
+          />
+        </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+interface ProfileTableProps {
+  title: string
+  headers: string[]
+  rows: Array<Array<number | string>>
+  empty: string
+}
+
+function ProfileTable({ title, headers, rows, empty }: ProfileTableProps) {
+  return (
+    <Card className="overflow-hidden border-slate-800 bg-slate-900">
+      <div className="border-b border-slate-800 px-5 py-4 text-sm font-bold text-white">{title}</div>
+      <Table>
+        <TableHeader className="bg-slate-800/50">
+          {headers.map((header) => <TableHead key={header} className="text-slate-300">{header}</TableHead>)}
+        </TableHeader>
+        <TableBody>
+          {rows.length ? rows.map((row, index) => (
+            <TableRow key={`${title}-${index}`} className="border-slate-800">
+              {row.map((value, column) => <TableCell key={column} className="font-mono text-slate-200">{value}</TableCell>)}
+            </TableRow>
+          )) : (
+            <TableRow>
+              <TableCell colSpan={headers.length} className="py-8 text-center text-sm text-slate-500">{empty}</TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </Card>
   )
 }

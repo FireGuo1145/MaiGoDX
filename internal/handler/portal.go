@@ -23,6 +23,26 @@ type portalTrendPoint struct {
 	Rating int    `json:"rating"`
 }
 
+type portalPartner struct {
+	PartnerID int `json:"partnerId"`
+}
+
+type portalTravelPartner struct {
+	PartnerID             int `json:"partnerId"`
+	IntimateLevel         int `json:"intimateLevel"`
+	IntimateCountRewarded int `json:"intimateCountRewarded"`
+}
+
+type portalFunctionTicket struct {
+	ItemID int `json:"itemId"`
+	Stock  int `json:"stock"`
+}
+
+type portalRegion struct {
+	RegionID  int `json:"regionId"`
+	PlayCount int `json:"playCount"`
+}
+
 // HandleGetStats returns only persisted game data. It deliberately does not invent a
 // profile, rating, trend, or ranking when no maimai record is associated with the account.
 func HandleGetStats(w http.ResponseWriter, r *http.Request) {
@@ -43,6 +63,9 @@ func HandleGetStats(w http.ResponseWriter, r *http.Request) {
 			"bests":    []portalSong{},
 			"newBests": []portalSong{},
 		},
+		"travelPartners":  []portalTravelPartner{},
+		"functionTickets": []portalFunctionTicket{},
+		"regions":         []portalRegion{},
 	}
 
 	account, ok := requireAccount(w, r)
@@ -73,8 +96,45 @@ func HandleGetStats(w http.ResponseWriter, r *http.Request) {
 	response["trend"] = makeTrend(plays)
 	response["rankCounts"] = rankCounts(plays)
 	response["ratingComposition"] = makeRatingComposition(detail.UserID)
+	response["partner"] = portalPartner{PartnerID: detail.PartnerID}
+	response["travelPartners"] = portalTravelPartners(detail.UserID)
+	response["functionTickets"] = portalFunctionTickets(detail.UserID)
+	response["regions"] = portalRegions(detail.UserID)
 
 	_ = json.NewEncoder(w).Encode(response)
+}
+
+func portalTravelPartners(userID int64) []portalTravelPartner {
+	var values []model.UserIntimate
+	database.DB.Where("user_id = ?", userID).Order("partner_id asc").Find(&values)
+	result := make([]portalTravelPartner, 0, len(values))
+	for _, value := range values {
+		result = append(result, portalTravelPartner{
+			PartnerID: value.PartnerID, IntimateLevel: value.IntimateLevel, IntimateCountRewarded: value.IntimateCountRewarded,
+		})
+	}
+	return result
+}
+
+func portalFunctionTickets(userID int64) []portalFunctionTicket {
+	var values []model.UserItem
+	// Item kind 12 is the maimai DX function-ticket inventory.
+	database.DB.Where("user_id = ? AND item_kind = ?", userID, 12).Order("item_id asc").Find(&values)
+	result := make([]portalFunctionTicket, 0, len(values))
+	for _, value := range values {
+		result = append(result, portalFunctionTicket{ItemID: value.ItemID, Stock: value.Stock})
+	}
+	return result
+}
+
+func portalRegions(userID int64) []portalRegion {
+	var values []model.UserRegion
+	database.DB.Where("user_id = ?", userID).Order("region_id asc").Find(&values)
+	result := make([]portalRegion, 0, len(values))
+	for _, value := range values {
+		result = append(result, portalRegion{RegionID: value.RegionID, PlayCount: value.PlayCount})
+	}
+	return result
 }
 
 func makeTrend(plays []model.UserPlaylog) []portalTrendPoint {

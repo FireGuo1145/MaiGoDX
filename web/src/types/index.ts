@@ -62,9 +62,29 @@ export interface GameCharge {
 export interface UserDetail {
   userId: number
   userName: string
-  rating: number
-  maxRating: number
+  playerRating: number
+  highestRating: number
   totalPoint: number
+}
+
+export interface Partner {
+  partnerId: number
+}
+
+export interface TravelPartner {
+  partnerId: number
+  intimateLevel: number
+  intimateCountRewarded: number
+}
+
+export interface FunctionTicket {
+  itemId: number
+  stock: number
+}
+
+export interface Region {
+  regionId: number
+  playCount: number
 }
 
 export interface SongComp {
@@ -89,6 +109,10 @@ export interface Stats {
   totalUsers: number
   totalPlays: number
   user?: UserDetail
+  partner?: Partner
+  travelPartners: TravelPartner[]
+  functionTickets: FunctionTicket[]
+  regions: Region[]
   recentPlays: Playlog[]
   trend: TrendPoint[]
   rankCounts: Record<'SSS+' | 'SSS' | 'SS' | 'S', number>

@@ -38,8 +38,8 @@ function RatingList({ title, songs, tone, emptyMessage }: RatingListProps) {
 }
 
 export function DashboardPage({ stats }: DashboardPageProps) {
-  const rating = stats?.user?.rating
-  const maxRating = stats?.user?.maxRating
+  const rating = stats?.user?.playerRating
+  const maxRating = stats?.user?.highestRating
   const playCount = stats?.totalPlays
   const trend = stats?.trend ?? []
 
