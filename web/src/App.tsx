@@ -173,7 +173,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage stats={stats} />} />
         <Route path="/dashboard" element={<DashboardPage stats={stats} />} />
-        <Route path="/maimai" element={<MaimaiPage stats={stats} />} />
+        <Route path="/maimai" element={<MaimaiPage stats={stats} onProfileChanged={refreshStats} />} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/settings" element={<SettingsPage user={user} cards={cards} onCardsChanged={refreshCards} />} />
         <Route

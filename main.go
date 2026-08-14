@@ -52,6 +52,7 @@ func main() {
 	mux.HandleFunc("/api/card/bind", handler.HandleBindCard)
 	mux.HandleFunc("/api/card/list", handler.HandleGetUserCards)
 	mux.HandleFunc("/api/stats", handler.HandleGetStats)
+	mux.HandleFunc("/api/maimai/profile/update", handler.HandleUpdatePortalProfile)
 	mux.HandleFunc("/sys/test", handler.HandleAllNetSelfTest)
 	mux.HandleFunc("/naomitest.html", handler.HandleNaomiTest)
 	mux.HandleFunc("/sys/servlet/PowerOn", handler.HandleAllNetPowerOn)

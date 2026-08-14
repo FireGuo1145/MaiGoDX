@@ -87,6 +87,13 @@ export interface Region {
   playCount: number
 }
 
+export interface ProfileUpdate {
+  partnerId: number
+  travelPartners: TravelPartner[]
+  functionTickets: FunctionTicket[]
+  regions: Region[]
+}
+
 export interface SongComp {
   musicId: number
   level: number
@@ -165,6 +172,7 @@ export interface AuthNotice {
 
 export const API_PATHS = {
   stats: '/api/stats',
+  updateProfile: '/api/maimai/profile/update',
   login: '/api/auth/login',
   me: '/api/auth/me',
   register: '/api/auth/register',

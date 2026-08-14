@@ -1,18 +1,57 @@
+import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { RANK_SUMMARY, type Stats } from '@/types'
+import api from '@/lib/api'
+import { apiErrorMessage, RANK_SUMMARY, type FunctionTicket, type Region, type Stats, type TravelPartner } from '@/types'
 
 interface MaimaiPageProps {
   stats: Stats | null
+  onProfileChanged: () => Promise<void>
 }
 
-export function MaimaiPage({ stats }: MaimaiPageProps) {
+export function MaimaiPage({ stats, onProfileChanged }: MaimaiPageProps) {
   const plays = stats?.recentPlays || []
   const travelPartners = stats?.travelPartners || []
   const functionTickets = stats?.functionTickets || []
   const regions = stats?.regions || []
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [partnerID, setPartnerID] = useState('0')
+  const [travelPartnerText, setTravelPartnerText] = useState('')
+  const [ticketText, setTicketText] = useState('')
+  const [regionText, setRegionText] = useState('')
+  const [profileError, setProfileError] = useState('')
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+
+  const startProfileEdit = () => {
+    setPartnerID(String(stats?.partner?.partnerId || 0))
+    setTravelPartnerText(travelPartners.map((partner) => `${partner.partnerId}, ${partner.intimateLevel}, ${partner.intimateCountRewarded}`).join('\n'))
+    setTicketText(functionTickets.map((ticket) => `${ticket.itemId}, ${ticket.stock}`).join('\n'))
+    setRegionText(regions.map((region) => `${region.regionId}, ${region.playCount}`).join('\n'))
+    setProfileError('')
+    setIsEditingProfile(true)
+  }
+
+  const saveProfile = async () => {
+    try {
+      setIsSavingProfile(true)
+      setProfileError('')
+      await api.updateProfile({
+        partnerId: parseInteger(partnerID, '搭档 ID'),
+        travelPartners: parseTravelPartners(travelPartnerText),
+        functionTickets: parseFunctionTickets(ticketText),
+        regions: parseRegions(regionText),
+      })
+      await onProfileChanged()
+      setIsEditingProfile(false)
+    } catch (error) {
+      setProfileError(apiErrorMessage(error))
+    } finally {
+      setIsSavingProfile(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -62,6 +101,27 @@ export function MaimaiPage({ stats }: MaimaiPageProps) {
         </TabsContent>
 
         <TabsContent id="profile" className="mt-6 space-y-6">
+          <div className="flex justify-end">
+            <Button variant={isEditingProfile ? 'outline' : 'default'} onPress={() => isEditingProfile ? setIsEditingProfile(false) : startProfileEdit()}>
+              {isEditingProfile ? '取消编辑' : '编辑档案'}
+            </Button>
+          </div>
+          {isEditingProfile ? (
+            <Card className="space-y-4 border-indigo-500/40 bg-slate-900 p-5">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-300">当前搭档 ID</label>
+                <input value={partnerID} onChange={(event) => setPartnerID(event.target.value)} inputMode="numeric" className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-indigo-500" />
+              </div>
+              <ProfileTextInput label="旅行伙伴" hint="每行：搭档 ID, 亲密度等级, 已领奖励次数" value={travelPartnerText} onChange={setTravelPartnerText} />
+              <ProfileTextInput label="功能票" hint="每行：票种 ID, 库存" value={ticketText} onChange={setTicketText} />
+              <ProfileTextInput label="区域游玩记录" hint="每行：区域 ID, 游玩次数" value={regionText} onChange={setRegionText} />
+              {profileError && <p className="text-sm text-red-400">{profileError}</p>}
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onPress={() => setIsEditingProfile(false)}>取消</Button>
+                <Button onPress={() => void saveProfile()} isDisabled={isSavingProfile}>{isSavingProfile ? '保存中…' : '保存档案'}</Button>
+              </div>
+            </Card>
+          ) : null}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Card className="border-slate-800 bg-slate-900 p-5">
               <p className="text-sm font-medium text-slate-400">当前搭档</p>
@@ -99,6 +159,56 @@ export function MaimaiPage({ stats }: MaimaiPageProps) {
       </Tabs>
     </div>
   )
+}
+
+interface ProfileTextInputProps {
+  label: string
+  hint: string
+  value: string
+  onChange: (value: string) => void
+}
+
+function ProfileTextInput({ label, hint, value, onChange }: ProfileTextInputProps) {
+  return <div>
+    <label className="mb-1 block text-sm font-medium text-slate-300">{label}</label>
+    <textarea value={value} onChange={(event) => onChange(event.target.value)} placeholder={hint} rows={3} className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-white outline-none focus:border-indigo-500" />
+    <p className="mt-1 text-xs text-slate-500">{hint}。留空将清空该类数据。</p>
+  </div>
+}
+
+function parseInteger(value: string, label: string) {
+  const parsed = Number(value.trim())
+  if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`${label} 必须是非负整数`)
+  return parsed
+}
+
+function parseFunctionTickets(value: string): FunctionTicket[] {
+  return parsePairs(value, '功能票').map(([itemId, stock]) => ({ itemId, stock }))
+}
+
+function parseRegions(value: string): Region[] {
+  return parsePairs(value, '区域').map(([regionId, playCount]) => ({ regionId, playCount }))
+}
+
+function parsePairs(value: string, label: string) {
+  return parseRows(value, 2, label)
+}
+
+function parseTravelPartners(value: string): TravelPartner[] {
+  return parseRows(value, 3, '旅行伙伴').map(([partnerId, intimateLevel, intimateCountRewarded]) => ({ partnerId, intimateLevel, intimateCountRewarded }))
+}
+
+function parseRows(value: string, width: number, label: string): number[][] {
+  const rows = value.split('\n').map((line) => line.trim()).filter(Boolean)
+  const ids = new Set<number>()
+  return rows.map((line, index) => {
+    const fields = line.split(',').map((field) => Number(field.trim()))
+    if (fields.length !== width || fields.some((field) => !Number.isInteger(field) || field < 0) || ids.has(fields[0])) {
+      throw new Error(`${label} 第 ${index + 1} 行格式无效或 ID 重复`)
+    }
+    ids.add(fields[0])
+    return fields
+  })
 }
 
 interface ProfileTableProps {

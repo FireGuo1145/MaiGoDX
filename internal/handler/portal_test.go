@@ -32,3 +32,40 @@ func TestPortalProfileCollectionsUsePersistedGameData(t *testing.T) {
 		t.Fatalf("regions=%v", regions)
 	}
 }
+
+func TestSavePortalProfileReplacesEditableCollections(t *testing.T) {
+	setupMaimaiTestDB(t)
+	detail := model.UserDetail{UserID: 11, PartnerID: 1}
+	if err := database.DB.Create(&detail).Error; err != nil {
+		t.Fatalf("create detail: %v", err)
+	}
+	if err := database.DB.Create(&model.UserItem{UserID: 11, ItemKind: 1, ItemID: 99, Stock: 1}).Error; err != nil {
+		t.Fatalf("create unrelated item: %v", err)
+	}
+	request := portalProfileUpdateRequest{
+		PartnerID:       8,
+		TravelPartners:  []portalTravelPartner{{PartnerID: 3, IntimateLevel: 4, IntimateCountRewarded: 2}},
+		FunctionTickets: []portalFunctionTicket{{ItemID: 7, Stock: 5}},
+		Regions:         []portalRegion{{RegionID: 2, PlayCount: 9}},
+	}
+	if err := savePortalProfile(detail, request); err != nil {
+		t.Fatalf("save portal profile: %v", err)
+	}
+	var saved model.UserDetail
+	if err := database.DB.Where("user_id = ?", 11).First(&saved).Error; err != nil || saved.PartnerID != 8 {
+		t.Fatalf("saved partner=%d err=%v", saved.PartnerID, err)
+	}
+	if partners := portalTravelPartners(11); len(partners) != 1 || partners[0].PartnerID != 3 {
+		t.Fatalf("saved travel partners=%v", partners)
+	}
+	if tickets := portalFunctionTickets(11); len(tickets) != 1 || tickets[0].ItemID != 7 {
+		t.Fatalf("saved tickets=%v", tickets)
+	}
+	if regions := portalRegions(11); len(regions) != 1 || regions[0].RegionID != 2 {
+		t.Fatalf("saved regions=%v", regions)
+	}
+	var unrelated model.UserItem
+	if err := database.DB.Where("user_id = ? AND item_kind = ?", 11, 1).First(&unrelated).Error; err != nil {
+		t.Fatalf("unrelated item was removed: %v", err)
+	}
+}

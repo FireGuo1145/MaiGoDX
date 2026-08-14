@@ -2,12 +2,14 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"sort"
 	"time"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
+	"gorm.io/gorm"
 )
 
 type portalSong struct {
@@ -41,6 +43,13 @@ type portalFunctionTicket struct {
 type portalRegion struct {
 	RegionID  int `json:"regionId"`
 	PlayCount int `json:"playCount"`
+}
+
+type portalProfileUpdateRequest struct {
+	PartnerID       int                    `json:"partnerId"`
+	TravelPartners  []portalTravelPartner  `json:"travelPartners"`
+	FunctionTickets []portalFunctionTicket `json:"functionTickets"`
+	Regions         []portalRegion         `json:"regions"`
 }
 
 // HandleGetStats returns only persisted game data. It deliberately does not invent a
@@ -102,6 +111,114 @@ func HandleGetStats(w http.ResponseWriter, r *http.Request) {
 	response["regions"] = portalRegions(detail.UserID)
 
 	_ = json.NewEncoder(w).Encode(response)
+}
+
+// HandleUpdatePortalProfile lets an authenticated owner update the parts of
+// their maimai profile exposed by the portal. The game user ID is resolved
+// from the account's bound Aime card; callers cannot edit another profile.
+func HandleUpdatePortalProfile(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	account, ok := requireAccount(w, r)
+	if !ok {
+		return
+	}
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var request portalProfileUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writePortalUpdateError(w, http.StatusBadRequest, "请求参数错误")
+		return
+	}
+	detail, err := portalDetailForAccount(account.ID)
+	if err != nil {
+		writePortalUpdateError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if err := savePortalProfile(detail, request); err != nil {
+		writePortalUpdateError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "message": "游戏档案已保存"})
+}
+
+func writePortalUpdateError(w http.ResponseWriter, status int, message string) {
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": message})
+}
+
+func portalDetailForAccount(accountID uint) (model.UserDetail, error) {
+	var card model.UserCard
+	lookup := database.DB.Where("user_id = ? AND game_user_id > 0", accountID).Order("id asc").Limit(1).Find(&card)
+	if lookup.Error != nil || lookup.RowsAffected == 0 {
+		return model.UserDetail{}, errors.New("当前账户尚未关联 maimai 游戏档案")
+	}
+	var detail model.UserDetail
+	lookup = database.DB.Where("user_id = ?", card.GameUserID).Limit(1).Find(&detail)
+	if lookup.Error != nil || lookup.RowsAffected == 0 {
+		return model.UserDetail{}, errors.New("已关联的卡片尚未创建 maimai 游戏档案")
+	}
+	return detail, nil
+}
+
+func savePortalProfile(detail model.UserDetail, request portalProfileUpdateRequest) error {
+	if request.PartnerID < 0 || !validPortalProfileCollections(request) {
+		return errors.New("档案数据包含无效的负数或重复 ID")
+	}
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.UserDetail{}).Where("user_id = ?", detail.UserID).Update("partner_id", request.PartnerID).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", detail.UserID).Delete(&model.UserIntimate{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ? AND item_kind = ?", detail.UserID, 12).Delete(&model.UserItem{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", detail.UserID).Delete(&model.UserRegion{}).Error; err != nil {
+			return err
+		}
+		for _, value := range request.TravelPartners {
+			if err := tx.Create(&model.UserIntimate{UserID: detail.UserID, PartnerID: value.PartnerID, IntimateLevel: value.IntimateLevel, IntimateCountRewarded: value.IntimateCountRewarded}).Error; err != nil {
+				return err
+			}
+		}
+		for _, value := range request.FunctionTickets {
+			if err := tx.Create(&model.UserItem{UserID: detail.UserID, ItemKind: 12, ItemID: value.ItemID, Stock: value.Stock, IsValid: true}).Error; err != nil {
+				return err
+			}
+		}
+		for _, value := range request.Regions {
+			if err := tx.Create(&model.UserRegion{UserID: detail.UserID, RegionID: value.RegionID, PlayCount: value.PlayCount}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func validPortalProfileCollections(request portalProfileUpdateRequest) bool {
+	partners, tickets, regions := map[int]bool{}, map[int]bool{}, map[int]bool{}
+	for _, value := range request.TravelPartners {
+		if value.PartnerID < 0 || value.IntimateLevel < 0 || value.IntimateCountRewarded < 0 || partners[value.PartnerID] {
+			return false
+		}
+		partners[value.PartnerID] = true
+	}
+	for _, value := range request.FunctionTickets {
+		if value.ItemID < 0 || value.Stock < 0 || tickets[value.ItemID] {
+			return false
+		}
+		tickets[value.ItemID] = true
+	}
+	for _, value := range request.Regions {
+		if value.RegionID < 0 || value.PlayCount < 0 || regions[value.RegionID] {
+			return false
+		}
+		regions[value.RegionID] = true
+	}
+	return true
 }
 
 func portalTravelPartners(userID int64) []portalTravelPartner {
