@@ -211,7 +211,7 @@ export default function App() {
         <Route path="/dashboard" element={<DashboardPage stats={stats} />} />
         <Route path="/maimai" element={<MaimaiPage stats={stats} onProfileChanged={() => refreshStats(selectedProfileCardID)} />} />
         <Route path="/setup" element={<SetupPage />} />
-        <Route path="/settings" element={<SettingsPage user={user} cards={cards} configs={configs} onCardsChanged={refreshCards} onConfigsChanged={refreshAdminConfigs} />} />
+        <Route path="/settings" element={<SettingsPage user={user} cards={cards} onCardsChanged={refreshCards} />} />
         <Route
           path="/admin"
           element={user.isAdmin
