@@ -27,6 +27,7 @@ func setupMaimaiTestDB(t *testing.T) {
 	database.DB = db
 	if err := db.AutoMigrate(
 		&model.SystemConfig{}, &model.UserCard{}, &model.UserDetail{}, &model.UserOption{}, &model.UserExtend{}, &model.UserPlaylog{},
+		&model.Terminal{},
 		&model.UserCharacter{}, &model.UserItem{}, &model.UserMap{}, &model.UserFavorite{},
 		&model.UserMusicDetail{}, &model.UserCharge{}, &model.UserFriendSeasonRanking{}, &model.UserCourse{}, &model.UserLoginBonus{}, &model.UserGeneralData{},
 		&model.UserUdemae{}, &model.UserKaleidx{}, &model.UserIntimate{}, &model.UserActivity{}, &model.UserRegion{},

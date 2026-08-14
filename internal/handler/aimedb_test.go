@@ -2,7 +2,10 @@ package handler
 
 import (
 	"encoding/binary"
+	"io"
+	"net"
 	"testing"
+	"time"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
@@ -75,6 +78,58 @@ func TestAimeStaticResponsesMatchAquaDXCapacities(t *testing.T) {
 		if got := binary.LittleEndian.Uint16(response[0x04:0x06]); got != test.wantCode {
 			t.Fatalf("type 0x%02x response code=%#x, want %#x", test.requestType, got, test.wantCode)
 		}
+	}
+}
+
+func TestAimeDBEncryptedLookupV2WireFlowMatchesAquaDX(t *testing.T) {
+	setupMaimaiTestDB(t)
+	const accessCode = "50100000000000000001"
+	if err := database.DB.Create(&model.UserCard{AccessCode: accessCode, GameUserID: 4242}).Error; err != nil {
+		t.Fatalf("create card: %v", err)
+	}
+	if err := database.DB.Create(&model.Terminal{KeychipID: "A0000001234", GameID: "SDEZ", IsEnabled: true}).Error; err != nil {
+		t.Fatalf("create terminal: %v", err)
+	}
+
+	server, client := net.Pipe()
+	defer client.Close()
+	go serveAimeDBConnection(server)
+
+	request := make([]byte, 0x30)
+	binary.LittleEndian.PutUint16(request[0x00:0x02], 0xa13e)
+	binary.LittleEndian.PutUint16(request[0x02:0x04], 0x3087)
+	binary.LittleEndian.PutUint16(request[0x04:0x06], 0x0f)
+	binary.LittleEndian.PutUint16(request[0x06:0x08], uint16(len(request)))
+	copy(request[0x0a:0x10], "SDEZ")
+	copy(request[0x14:0x20], "A0000001234")
+	copy(request[0x20:0x2a], []byte{0x50, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01})
+	encryptedRequest, err := cryptAimeDB(request, true)
+	if err != nil {
+		t.Fatalf("encrypt request: %v", err)
+	}
+	if _, err := client.Write(encryptedRequest); err != nil {
+		t.Fatalf("write request: %v", err)
+	}
+
+	if err := client.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatalf("set deadline: %v", err)
+	}
+	encryptedResponse := make([]byte, 0x130)
+	if _, err := io.ReadFull(client, encryptedResponse); err != nil {
+		t.Fatalf("read response: %v", err)
+	}
+	response, err := cryptAimeDB(encryptedResponse, false)
+	if err != nil {
+		t.Fatalf("decrypt response: %v", err)
+	}
+	if got := binary.LittleEndian.Uint16(response[0x00:0x02]); got != 0xa13e {
+		t.Fatalf("magic=%#x, want %#x", got, 0xa13e)
+	}
+	if got := binary.LittleEndian.Uint16(response[0x04:0x06]); got != 0x10 {
+		t.Fatalf("response code=%#x, want %#x", got, 0x10)
+	}
+	if got := binary.LittleEndian.Uint32(response[0x20:0x24]); got != 4242 {
+		t.Fatalf("Aime ID=%d, want 4242", got)
 	}
 }
 

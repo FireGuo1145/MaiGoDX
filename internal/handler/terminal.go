@@ -95,7 +95,12 @@ func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 	} else {
 		log.Printf("[MaiGoDX] ALL.Net PowerOn permissive compatibility: accepting unregistered keychip=%s game=%s", keychip, gameID)
 	}
+	// AquaDX deliberately distinguishes the address a cabinet must connect to
+	// from the administrative host value returned in the PowerOn payload.  A
+	// forwarding ALL.Net proxy supplies AllNet-Forwarded-From for the former;
+	// an explicitly configured host remains the latter.
 	base := allNetPublicHost(r)
+	responseHost := allNetResponseHost(r, base)
 	uriBase := allNetPublicScheme() + "://" + base
 	routeMode := "g"
 	sessionLog := "disabled"
@@ -118,7 +123,7 @@ func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 		uriBase += "/g"
 	}
 	uri := uriBase + "/" + gameID + "/" + version + "/"
-	fields := aquaPowerOnFields(uri, base, request["token"], request["format_ver"])
+	fields := aquaPowerOnFields(uri, responseHost, request["token"], request["format_ver"])
 	log.Printf("[MaiGoDX] ALL.Net PowerOn accepted: keychip=%s terminal=%d game=%s version=%s route=%s session=%s uri=%s remote=%s", keychip, terminal.ID, gameID, version, routeMode, sessionLog, uri, clientIP(r))
 	// AquaDX returns a plain URL-formatted response with a trailing newline.
 	// KanadeDX parses this with Split('&') and Split('='), so compressed DFI
@@ -166,16 +171,26 @@ func allNetKeychipPermissive() bool {
 }
 
 func allNetPublicHost(r *http.Request) string {
-	if configured := strings.TrimSpace(maimaiConfigValue("allnet_public_host", "")); configured != "" {
-		return configured
-	}
-	// AquaDX gives this header precedence. It is supplied by an ALL.Net proxy
-	// when the Host header points at the proxy rather than the cabinet-reachable
-	// game server address.
+	// AquaDX gives this header precedence over allnet.server.host. It is
+	// supplied by an ALL.Net proxy when its Host header is not the address the
+	// cabinet should use for its subsequent title/game-server requests.
 	if forwarded := strings.TrimSpace(r.Header.Get("AllNet-Forwarded-From")); forwarded != "" {
 		return forwarded
 	}
+	if configured := strings.TrimSpace(maimaiConfigValue("allnet_public_host", "")); configured != "" {
+		return configured
+	}
 	return forwardedHost(r)
+}
+
+// allNetResponseHost mirrors AquaDX's `host` PowerOn field. This is the
+// configured server host where one exists, not necessarily the forwarded
+// cabinet-reachable address used in `uri`.
+func allNetResponseHost(r *http.Request, fallback string) string {
+	if configured := strings.TrimSpace(maimaiConfigValue("allnet_public_host", "")); configured != "" {
+		return configured
+	}
+	return fallback
 }
 
 func allNetPublicScheme() string {
