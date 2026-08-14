@@ -67,16 +67,26 @@ func serveAimeDBConnection(conn net.Conn) {
 		return
 	}
 
-	requestType := binary.LittleEndian.Uint16(request[0x04:0x06])
-	gameID := trimAimeASCII(request[0x0a:0x10])
-	keychip := trimAimeASCII(request[0x14:0x20])
-	if requestType != 0x13 && !aimeDBKeychipExists(keychip) && !allNetKeychipPermissive() {
-		log.Printf("[MaiGoDX] AimeDB rejected: unknown Keychip=%s type=0x%02x game=%s remote=%s", keychip, requestType, gameID, remote)
-		return
-	}
-	if requestType != 0x13 && !aimeDBKeychipExists(keychip) && allNetKeychipPermissive() {
-		log.Printf("[MaiGoDX] AimeDB permissive compatibility: accepting unknown Keychip=%s type=0x%02x game=%s remote=%s", keychip, requestType, gameID, remote)
-	}
+		requestType := binary.LittleEndian.Uint16(request[0x04:0x06])
+		gameID := trimAimeASCII(request[0x0a:0x10])
+		keychip := trimAimeASCII(request[0x14:0x20])
+		if requestType != 0x13 && !aimeDBKeychipExists(keychip) {
+			if allNetKeychipPermissive() || !allNetKeychipProtectionEnabled() {
+				log.Printf("[MaiGoDX] AimeDB auto-registering / permitting unknown Keychip=%s type=0x%02x game=%s remote=%s", keychip, requestType, gameID, remote)
+				var terminal model.Terminal
+				if err := database.DB.Where("keychip_id = ?", keychip).First(&terminal).Error; err != nil {
+				_ = database.DB.Create(&model.Terminal{
+					KeychipID: keychip,
+					GameID:    gameID,
+					IsEnabled: true,
+					Name:      "AimeDB 自动注册机台",
+				}).Error
+				}
+			} else {
+				log.Printf("[MaiGoDX] AimeDB rejected: unknown Keychip=%s type=0x%02x game=%s remote=%s", keychip, requestType, gameID, remote)
+				return
+			}
+		}
 
 	response, summary, err := handleAimeDBRequest(requestType, request)
 	if err != nil {
@@ -119,16 +129,25 @@ func readAimeDBRequest(reader io.Reader) ([]byte, bool, error) {
 	}
 
 	length := int(binary.LittleEndian.Uint16(plainHeader[6:8]))
-	if length < 0x20 || length > 4096 || length%aes.BlockSize != 0 {
+	if length < 0x20 || length > 4096 {
 		return nil, false, fmt.Errorf("invalid AimeDB packet length %d", length)
 	}
+	// Align to AES block size if needed for the reader to pull the full frame
+	readLength := length
+	if readLength%aes.BlockSize != 0 {
+		readLength += aes.BlockSize - (readLength % aes.BlockSize)
+	}
 	packet := append([]byte{}, first...)
-	if length > len(packet) {
-		rest := make([]byte, length-len(packet))
+	if readLength > len(packet) {
+		rest := make([]byte, readLength-len(packet))
 		if _, err := io.ReadFull(reader, rest); err != nil {
 			return nil, false, fmt.Errorf("read request body: %w", err)
 		}
 		packet = append(packet, rest...)
+	}
+	// Truncate to the actual protocol length if readLength was padded
+	if len(packet) > length {
+		packet = packet[:length]
 	}
 	if encrypted {
 		plain, err := cryptAimeDB(packet, false)
@@ -138,16 +157,26 @@ func readAimeDBRequest(reader io.Reader) ([]byte, bool, error) {
 }
 
 func writeAimeDBResponse(writer io.Writer, response []byte, encrypted bool) error {
-	if len(response) < 0x20 || len(response)%aes.BlockSize != 0 {
+	if len(response) < 0x20 {
 		return fmt.Errorf("invalid AimeDB response size %d", len(response))
 	}
-	binary.LittleEndian.PutUint16(response[0x00:0x02], 0xa13e)
-	binary.LittleEndian.PutUint16(response[0x02:0x04], 0x3087)
-	binary.LittleEndian.PutUint16(response[0x06:0x08], uint16(len(response)))
-	payload := response
+	// Always ensure the response is padded to AES block size before encryption
+	finalSize := len(response)
+	if finalSize%aes.BlockSize != 0 {
+		finalSize += aes.BlockSize - (finalSize % aes.BlockSize)
+	}
+	paddedResponse := make([]byte, finalSize)
+	copy(paddedResponse, response)
+
+	// Write standard AimeDB header to the PADDED buffer
+	binary.LittleEndian.PutUint16(paddedResponse[0x00:0x02], 0xa13e)
+	binary.LittleEndian.PutUint16(paddedResponse[0x02:0x04], 0x3087)
+	binary.LittleEndian.PutUint16(paddedResponse[0x06:0x08], uint16(finalSize))
+
+	payload := paddedResponse
 	if encrypted {
 		var err error
-		payload, err = cryptAimeDB(response, true)
+		payload, err = cryptAimeDB(paddedResponse, true)
 		if err != nil {
 			return err
 		}
@@ -157,24 +186,28 @@ func writeAimeDBResponse(writer io.Writer, response []byte, encrypted bool) erro
 }
 
 func cryptAimeDB(source []byte, encrypt bool) ([]byte, error) {
-	if len(source) == 0 || len(source)%aes.BlockSize != 0 {
-		return nil, fmt.Errorf("AimeDB payload must be a non-empty multiple of %d bytes", aes.BlockSize)
+	if len(source) == 0 {
+		return nil, errors.New("AimeDB payload must be non-empty")
 	}
 	block, err := aes.NewCipher([]byte(aimeDBKey))
 	if err != nil {
 		return nil, err
 	}
+	// AimeDB uses ECB mode, so we process block by block.
+	// If the last block is partial, it is not encrypted/decrypted in standard ECB,
+	// but AimeDB protocol length might not be a multiple of 16.
 	result := make([]byte, len(source))
-	if encrypt {
-		block.Encrypt(result[:aes.BlockSize], source[:aes.BlockSize])
-		for offset := aes.BlockSize; offset < len(source); offset += aes.BlockSize {
+	fullBlocks := (len(source) / aes.BlockSize) * aes.BlockSize
+	for offset := 0; offset < fullBlocks; offset += aes.BlockSize {
+		if encrypt {
 			block.Encrypt(result[offset:offset+aes.BlockSize], source[offset:offset+aes.BlockSize])
-		}
-	} else {
-		block.Decrypt(result[:aes.BlockSize], source[:aes.BlockSize])
-		for offset := aes.BlockSize; offset < len(source); offset += aes.BlockSize {
+		} else {
 			block.Decrypt(result[offset:offset+aes.BlockSize], source[offset:offset+aes.BlockSize])
 		}
+	}
+	// Copy any remaining bytes as-is (though typically protocol frames are padded to 16)
+	if fullBlocks < len(source) {
+		copy(result[fullBlocks:], source[fullBlocks:])
 	}
 	return result, nil
 }
@@ -271,7 +304,7 @@ func aimeFelicaLookupV1(request []byte) ([]byte, string, error) {
 }
 
 func aimeFelicaLookupV2(request []byte) ([]byte, string, error) {
-	// AquaDX reads the IDm at 0x30 as a signed big-endian 64-bit value,
+	// AquaDX reads the IDm at 0x30 as a signed little-endian 64-bit value,
 	// converts its decimal representation to a 20-digit access code, then
 	// resolves that card to the game's external user ID.
 	accessCode, err := aimeFelicaAccessCode(request, 0x30)
@@ -291,8 +324,8 @@ func aimeFelicaLookupV2(request []byte) ([]byte, string, error) {
 	}
 	response := aimeStaticResponse(0x140, 0x12, 1)
 	binary.LittleEndian.PutUint64(response[0x20:0x28], uint64(aimeID))
-	binary.LittleEndian.PutUint32(response[0x24:0x28], ^uint32(0))
-	binary.LittleEndian.PutUint32(response[0x28:0x2c], ^uint32(0))
+	binary.LittleEndian.PutUint32(response[0x24:0x28], 0xFFFFFFFF)
+	binary.LittleEndian.PutUint32(response[0x28:0x2c], 0xFFFFFFFF)
 	copy(response[0x2c:0x36], accessCodeBytes)
 	response[0x37] = 0x01
 	return response, fmt.Sprintf("felica-v2 access=%s found=%t aimeId=%d", maskAimeAccessCode(accessCode), found, aimeID), nil
@@ -302,7 +335,7 @@ func aimeFelicaAccessCode(request []byte, offset int) (string, error) {
 	if len(request) < offset+8 {
 		return "", errors.New("short Felica request")
 	}
-	idm := int64(binary.BigEndian.Uint64(request[offset : offset+8]))
+	idm := int64(binary.LittleEndian.Uint64(request[offset : offset+8]))
 	value := strings.TrimPrefix(strconv.FormatInt(idm, 10), "-")
 	return strings.Repeat("0", max(0, 20-len(value))) + value, nil
 }

@@ -17,8 +17,8 @@ import (
 // machine-delivered settings.
 func maimaiCompatibilityPayload(apiName string, userID int64, body []byte) (interface{}, bool) {
 	switch apiName {
-	case "CreateToken":
-		return map[string]interface{}{"Bearer": maimaiConfigValue("maimai_bearer_token", "")}, true
+		case "CreateToken":
+			return map[string]interface{}{"Bearer": maimaiConfigValue("maimai_bearer_token", "meow")}, true
 	case "CMUpsertUserPrintlog":
 		orderID := requestString(body, "orderId")
 		if orderID == "" {
@@ -50,18 +50,18 @@ func maimaiCompatibilityPayload(apiName string, userID int64, body []byte) (inte
 			{"gateId": 7, "phaseId": 6}, {"gateId": 8, "phaseId": 6}, {"gateId": 9, "phaseId": 6},
 			{"gateId": 10, "phaseId": 13},
 		}}, true
-	case "GetUserFriendBonus":
-		return map[string]interface{}{"userId": userID, "returnCode": 0, "getMiles": 0}, true
+		case "GetUserFriendBonus":
+			return map[string]interface{}{"userId": userID, "returnCode": 1, "getMiles": 0}, true
 	case "GetTransferFriend":
 		return map[string]interface{}{"userId": userID, "transferFriendList": []interface{}{}}, true
 	case "GetUserNewItem":
 		return map[string]interface{}{"userId": userID, "itemKind": 0, "itemId": 0}, true
 	case "GetUserNewItemList":
 		return map[string]interface{}{"userId": userID, "userItemList": []interface{}{}}, true
-	case "GetUserFriendCheck":
-		return map[string]interface{}{"returnCode": 0}, true
-	case "UserFriendRegist":
-		return map[string]interface{}{"returnCode1": 0, "returnCode2": 0}, true
+		case "GetUserFriendCheck":
+			return map[string]interface{}{"returnCode": 1}, true
+		case "UserFriendRegist":
+			return map[string]interface{}{"returnCode1": 1, "returnCode2": 1}, true
 	case "GetUserShopStock":
 		stocks := make([]map[string]interface{}, 0)
 		for _, shopItemID := range requestIntSlice(body, "shopItemIdList") {
@@ -120,8 +120,8 @@ func maimaiCompatibilityPayload(apiName string, userID int64, body []byte) (inte
 		return map[string]interface{}{
 			"returnCode": 1, "loginCount": 1, "lastLoginDate": "2020-01-01 00:00:00.0",
 			"consecutiveLoginCount": 0, "loginId": 1,
-			"Bearer": maimaiConfigValue("maimai_bearer_token", ""), "bearer": maimaiConfigValue("maimai_bearer_token", ""),
-		}, true
+				"Bearer": maimaiConfigValue("maimai_bearer_token", "meow"), "bearer": maimaiConfigValue("maimai_bearer_token", "meow"),
+			}, true
 	case "GetGameWeeklyData":
 		return map[string]interface{}{
 			"gameWeeklyData": map[string]interface{}{
@@ -167,8 +167,8 @@ func maimaiCompatibilityPayload(apiName string, userID int64, body []byte) (inte
 			"jackingFestaSideId":     jackingSide,
 			"festaSideDataList":      []interface{}{},
 		}, true
-	case "GetPlaceCircleData":
-		return map[string]interface{}{"returnCode": 0, "circleId": 0, "aggrDate": ""}, true
+		case "GetPlaceCircleData":
+			return map[string]interface{}{"returnCode": 1, "circleId": 0, "aggrDate": ""}, true
 	case "GetUserCircleData":
 		return map[string]interface{}{
 			"circleId":               0,

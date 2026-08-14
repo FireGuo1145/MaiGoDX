@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
@@ -128,13 +129,26 @@ func handleUploadUserPlaylog(w http.ResponseWriter, apiName string, body []byte)
 }
 
 func requestUserID(body []byte) int64 {
-	var request struct {
-		UserID int64 `json:"userId"`
-	}
+	var request map[string]interface{}
 	if err := json.Unmarshal(body, &request); err != nil {
 		return 0
 	}
-	return request.UserID
+	val, ok := request["userId"]
+	if !ok {
+		return 0
+	}
+	switch v := val.(type) {
+	case float64:
+		return int64(v)
+	case string:
+		id, _ := strconv.ParseInt(v, 10, 64)
+		return id
+	case json.Number:
+		id, _ := v.Int64()
+		return id
+	default:
+		return 0
+	}
 }
 
 func userRating(userID int64) map[string]interface{} {
