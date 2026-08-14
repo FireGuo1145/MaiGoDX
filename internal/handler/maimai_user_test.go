@@ -241,6 +241,34 @@ func TestAquaDXParityEndpointsUseExpectedResponseShapes(t *testing.T) {
 	}
 }
 
+func TestFriendAndCircleStatusCodesMatchAquaDX(t *testing.T) {
+	setupMaimaiTestDB(t)
+	for _, test := range []struct {
+		api  string
+		body string
+		keys []string
+	}{
+		{api: "GetUserFriendBonusApi", body: `{"userId":1}`, keys: []string{"returnCode"}},
+		{api: "GetUserFriendCheckApi", body: `{}`, keys: []string{"returnCode"}},
+		{api: "UserFriendRegistApi", body: `{}`, keys: []string{"returnCode1", "returnCode2"}},
+		{api: "GetPlaceCircleDataApi", body: `{}`, keys: []string{"returnCode"}},
+	} {
+		request := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/"+test.api, strings.NewReader(test.body))
+		response := httptest.NewRecorder()
+		MaimaiHandler(response, request)
+
+		var payload map[string]interface{}
+		if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+			t.Fatalf("%s: decode response: %v", test.api, err)
+		}
+		for _, key := range test.keys {
+			if payload[key] != float64(0) {
+				t.Fatalf("%s %s=%v, want 0", test.api, key, payload[key])
+			}
+		}
+	}
+}
+
 func TestCMPreviewAndKaleidxMatchAquaDX(t *testing.T) {
 	setupMaimaiTestDB(t)
 	if err := database.DB.Create(&model.UserDetail{UserID: 501, UserName: "CardMaker", Rating: 12345, LastDataVersion: "1.60"}).Error; err != nil {

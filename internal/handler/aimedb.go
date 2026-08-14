@@ -67,26 +67,26 @@ func serveAimeDBConnection(conn net.Conn) {
 		return
 	}
 
-		requestType := binary.LittleEndian.Uint16(request[0x04:0x06])
-		gameID := trimAimeASCII(request[0x0a:0x10])
-		keychip := trimAimeASCII(request[0x14:0x20])
-		if requestType != 0x13 && !aimeDBKeychipExists(keychip) {
-			if allNetKeychipPermissive() || !allNetKeychipProtectionEnabled() {
-				log.Printf("[MaiGoDX] AimeDB auto-registering / permitting unknown Keychip=%s type=0x%02x game=%s remote=%s", keychip, requestType, gameID, remote)
-				var terminal model.Terminal
-				if err := database.DB.Where("keychip_id = ?", keychip).First(&terminal).Error; err != nil {
+	requestType := binary.LittleEndian.Uint16(request[0x04:0x06])
+	gameID := trimAimeASCII(request[0x0a:0x10])
+	keychip := trimAimeASCII(request[0x14:0x20])
+	if requestType != 0x13 && !aimeDBKeychipExists(keychip) {
+		if allNetKeychipPermissive() || !allNetKeychipProtectionEnabled() {
+			log.Printf("[MaiGoDX] AimeDB auto-registering / permitting unknown Keychip=%s type=0x%02x game=%s remote=%s", keychip, requestType, gameID, remote)
+			var terminal model.Terminal
+			if err := database.DB.Where("keychip_id = ?", keychip).First(&terminal).Error; err != nil {
 				_ = database.DB.Create(&model.Terminal{
 					KeychipID: keychip,
 					GameID:    gameID,
 					IsEnabled: true,
 					Name:      "AimeDB 自动注册机台",
 				}).Error
-				}
-			} else {
-				log.Printf("[MaiGoDX] AimeDB rejected: unknown Keychip=%s type=0x%02x game=%s remote=%s", keychip, requestType, gameID, remote)
-				return
 			}
+		} else {
+			log.Printf("[MaiGoDX] AimeDB rejected: unknown Keychip=%s type=0x%02x game=%s remote=%s", keychip, requestType, gameID, remote)
+			return
 		}
+	}
 
 	response, summary, err := handleAimeDBRequest(requestType, request)
 	if err != nil {
@@ -208,7 +208,7 @@ func handleAimeDBRequest(requestType uint16, request []byte) ([]byte, string, er
 	case 0x05:
 		return aimeRegister(request)
 	case 0x09:
-		return aimeStaticResponse(0x30, 0x0a, 1), "log", nil
+		return aimeStaticResponse(0x20, 0x0a, 1), "log", nil
 	case 0x0b:
 		return aimeStaticResponse(0x200, 0x0c, 1), "campaign", nil
 	case 0x0d:
@@ -223,7 +223,7 @@ func handleAimeDBRequest(requestType uint16, request []byte) ([]byte, string, er
 	case 0x13:
 		return aimeStaticResponse(0x40, 0x14, 1), "unknown-19", nil
 	case 0x64:
-		return aimeStaticResponse(0x30, 0x65, 1), "hello", nil
+		return aimeStaticResponse(0x20, 0x65, 1), "hello", nil
 	case 0x66:
 		return nil, "goodbye", nil
 	default:
@@ -291,7 +291,7 @@ func aimeFelicaLookupV1(request []byte) ([]byte, string, error) {
 }
 
 func aimeFelicaLookupV2(request []byte) ([]byte, string, error) {
-	// AquaDX reads the IDm at 0x30 as a signed little-endian 64-bit value,
+	// AquaDX reads the IDm at 0x30 as a signed big-endian 64-bit value,
 	// converts its decimal representation to a 20-digit access code, then
 	// resolves that card to the game's external user ID.
 	accessCode, err := aimeFelicaAccessCode(request, 0x30)
@@ -322,7 +322,12 @@ func aimeFelicaAccessCode(request []byte, offset int) (string, error) {
 	if len(request) < offset+8 {
 		return "", errors.New("short Felica request")
 	}
-	idm := int64(binary.LittleEndian.Uint64(request[offset : offset+8]))
+	// Netty's ByteBuf.getLong() is big-endian. AquaDX uses getLong() for the
+	// Felica IDm in both LookupV1 and LookupV2, then converts that signed Long
+	// to its 20-digit decimal access code. Reading this field as little-endian
+	// produces a different access code, so an actually registered Felica card
+	// is always reported as unknown by the cabinet.
+	idm := int64(binary.BigEndian.Uint64(request[offset : offset+8]))
 	value := strings.TrimPrefix(strconv.FormatInt(idm, 10), "-")
 	return strings.Repeat("0", max(0, 20-len(value))) + value, nil
 }
