@@ -1,6 +1,12 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+
+	"gorm.io/gorm"
+)
 
 // UserDetail persists a maimai player profile. UserID is the game card external ID.
 type UserDetail struct {
@@ -276,11 +282,70 @@ type UserMap struct {
 
 type UserFavorite struct {
 	gorm.Model `json:"-"`
-	UserID     int64  `gorm:"uniqueIndex:idx_user_favorite;not null" json:"userId"`
-	FavUserID  int64  `json:"favUserId"`
-	ItemKind   int    `gorm:"uniqueIndex:idx_user_favorite;not null" json:"itemKind"`
-	ItemID     int    `json:"itemId"`
-	ItemIDList string `gorm:"type:text" json:"itemIdList"`
+	UserID     int64 `gorm:"uniqueIndex:idx_user_favorite;not null" json:"userId"`
+	FavUserID  int64 `json:"favUserId"`
+	ItemKind   int   `gorm:"uniqueIndex:idx_user_favorite;not null" json:"itemKind"`
+	ItemID     int   `json:"itemId"`
+	// The database keeps the JSON representation in a text column, while
+	// maimai's protocol (and AquaDX) uses an integer array on the wire.
+	ItemIDList string `gorm:"type:text" json:"-"`
+}
+
+// UnmarshalJSON accepts maimai's itemIdList array and stores its canonical
+// JSON representation in the existing text column.
+func (u *UserFavorite) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	itemIDList := fields["itemIdList"]
+	delete(fields, "itemIdList")
+	withoutItemList, err := json.Marshal(fields)
+	if err != nil {
+		return err
+	}
+	type favoriteAlias UserFavorite
+	if err := json.Unmarshal(withoutItemList, (*favoriteAlias)(u)); err != nil {
+		return err
+	}
+	trimmed := bytes.TrimSpace(itemIDList)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		u.ItemIDList = ""
+		return nil
+	}
+	if trimmed[0] == '[' {
+		var values []int
+		if err := json.Unmarshal(trimmed, &values); err != nil {
+			return err
+		}
+		canonical, err := json.Marshal(values)
+		if err != nil {
+			return err
+		}
+		u.ItemIDList = string(canonical)
+		return nil
+	}
+	if trimmed[0] == '"' {
+		return json.Unmarshal(trimmed, &u.ItemIDList)
+	}
+	return fmt.Errorf("itemIdList must be an array or string")
+}
+
+// MarshalJSON restores the array-shaped protocol representation. Older rows
+// with an empty or invalid legacy value safely appear as an empty list.
+func (u UserFavorite) MarshalJSON() ([]byte, error) {
+	values := []int{}
+	if len(u.ItemIDList) != 0 {
+		_ = json.Unmarshal([]byte(u.ItemIDList), &values)
+	}
+	type favoriteAlias UserFavorite
+	return json.Marshal(struct {
+		favoriteAlias
+		ItemIDList []int `json:"itemIdList"`
+	}{
+		favoriteAlias: favoriteAlias(u),
+		ItemIDList:    values,
+	})
 }
 
 type UserMusicDetail struct {

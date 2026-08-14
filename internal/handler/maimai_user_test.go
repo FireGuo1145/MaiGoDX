@@ -128,7 +128,7 @@ func TestSDGAUpsertNormalizesSingletonCollections(t *testing.T) {
 	// SDGA 1.60 can send optional collection values as an object instead of
 	// an array. userData is already list-shaped here so this specifically
 	// covers a later collection that used to reject the entire logout save.
-	upsert := `{"userId":303,"upsertUserAll":{"userData":[{"userName":"SingletonPlayer","isNetMember":1}],"userOption":{"noteSpeed":7},"userRatingList":{"ratingList":[]}}}`
+	upsert := `{"userId":303,"upsertUserAll":{"userData":[{"userName":"SingletonPlayer","isNetMember":1}],"userOption":{"noteSpeed":7},"userRatingList":{"ratingList":[]},"userFavoriteList":{"itemKind":1,"itemIdList":[12,34]}}}`
 	request := httptest.NewRequest(http.MethodPost, "/g/SDGA/1.60/Maimai2Servlet/UpsertUserAllApi", strings.NewReader(upsert))
 	response := httptest.NewRecorder()
 	MaimaiHandler(response, request)
@@ -142,6 +142,13 @@ func TestSDGAUpsertNormalizesSingletonCollections(t *testing.T) {
 	}
 	assertRows(t, &model.UserDetail{}, 1)
 	assertRows(t, &model.UserOption{}, 1)
+	var favorite model.UserFavorite
+	if err := database.DB.Where("user_id = ? AND item_kind = ?", 303, 1).First(&favorite).Error; err != nil {
+		t.Fatalf("load favorite: %v", err)
+	}
+	if favorite.ItemIDList != "[12,34]" {
+		t.Fatalf("itemIdList storage=%q", favorite.ItemIDList)
+	}
 	assertRows(t, &model.UserPlaylog{}, 1)
 }
 
