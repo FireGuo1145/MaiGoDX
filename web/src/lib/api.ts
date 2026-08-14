@@ -9,6 +9,7 @@ import {
   type LoginResult,
   type ProfileUpdate,
   type RegisterResult,
+  type SiteSettingsResult,
   type StatsResult,
   type UsersResult,
   type Terminal,
@@ -20,6 +21,7 @@ import {
 } from '@/types'
 
 export const api = {
+  getSiteSettings: () => getJson<SiteSettingsResult>(API_PATHS.site),
   getStats: (cardId?: number) => getJson<StatsResult>(cardId ? `${API_PATHS.stats}?cardId=${cardId}` : API_PATHS.stats),
   updateProfile: (profile: ProfileUpdate) => postJson<ApiResult>(API_PATHS.updateProfile, profile),
   adjustFunctionTicket: (ticket: FunctionTicketAdjust) => postJson<ApiResult>(API_PATHS.adjustTicket, ticket),

@@ -148,6 +148,12 @@ export interface LoginResult extends ApiResult {
 
 export interface RegisterResult extends ApiResult {
   verifyToken?: string
+  verificationRequired?: boolean
+}
+
+export interface SiteSettingsResult extends ApiResult {
+  siteName: string
+  requireEmailVerification: boolean
 }
 
 export interface CardsResult extends ApiResult {
@@ -179,6 +185,7 @@ export interface AuthNotice {
 }
 
 export const API_PATHS = {
+  site: '/api/site',
   stats: '/api/stats',
   updateProfile: '/api/maimai/profile/update',
   adjustTicket: '/api/maimai/profile/ticket/adjust',

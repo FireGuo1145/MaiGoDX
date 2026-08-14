@@ -1,22 +1,93 @@
-import { useState } from 'react'
-import { CreditCard } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { CreditCard, ServerCog, UserRound } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import api from '@/lib/api'
 import { PersonalTerminalPanel } from '@/components/PersonalTerminalPanel'
-import type { UserAccount, UserCard } from '@/types'
+import type { SystemConfig, UserAccount, UserCard } from '@/types'
 import { apiErrorMessage, cardPreview, DEFAULT_CARD_NAME, initialOf, isAccessCodeValid, normalizeAccessCode } from '@/types'
 
 interface SettingsPageProps {
   user: UserAccount
   cards: UserCard[]
+  configs: SystemConfig[]
   onCardsChanged: () => Promise<void>
+  onConfigsChanged: () => Promise<void>
 }
 
-export function SettingsPage({ user, cards, onCardsChanged }: SettingsPageProps) {
+function SiteSettingsPanel({ configs, onConfigsChanged }: Pick<SettingsPageProps, 'configs' | 'onConfigsChanged'>) {
+  const savedSiteName = configs.find((config) => config.key === 'site_name')?.value || 'MaiGoDX'
+  const savedVerification = configs.find((config) => config.key === 'require_email_verification')?.value === 'true'
+  const [siteName, setSiteName] = useState(savedSiteName)
+  const [requireVerification, setRequireVerification] = useState(savedVerification)
+  const [status, setStatus] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    setSiteName(savedSiteName)
+    setRequireVerification(savedVerification)
+  }, [savedSiteName, savedVerification])
+
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const name = siteName.trim()
+    if (!name) {
+      setStatus('站点名称不能为空。')
+      return
+    }
+
+    setIsSaving(true)
+    setStatus(null)
+    try {
+      const results = await Promise.all([
+        api.updateConfig('site_name', name),
+        api.updateConfig('require_email_verification', String(requireVerification)),
+      ])
+      if (results.some((result) => !result.success)) throw new Error('站点设置保存失败')
+      await onConfigsChanged()
+      setStatus('站点设置已保存。')
+    } catch (error) {
+      setStatus(apiErrorMessage(error))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <Card className="bg-slate-900 border-slate-800">
+      <CardHeader>
+        <CardTitle className="text-white flex items-center gap-2"><ServerCog className="text-indigo-400" /> 站点设置</CardTitle>
+        <CardDescription className="text-slate-400">设置管理门户的显示名称和账户验证策略。</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={save} className="space-y-5">
+          <label className="block space-y-2">
+            <span className="text-xs font-medium text-slate-300">站点名称</span>
+            <input value={siteName} onChange={(event) => setSiteName(event.target.value)} maxLength={80} className="w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-md text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <span className="block text-xs text-slate-500">会显示在登录页，并作为每个浏览器页面标题的后缀。</span>
+          </label>
+          <label className="flex items-start gap-3 p-3 bg-slate-800/60 rounded-lg cursor-pointer">
+            <input type="checkbox" checked={requireVerification} onChange={(event) => setRequireVerification(event.target.checked)} className="mt-0.5 size-4 accent-indigo-500" />
+            <span>
+              <span className="block text-sm font-bold text-white">要求邮箱验证</span>
+              <span className="block mt-1 text-xs text-slate-400">开启后，新注册账户需完成邮箱验证才能登录；关闭后，新账户可直接登录。</span>
+            </span>
+          </label>
+          <div className="flex items-center gap-3">
+            <Button isDisabled={isSaving} type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold">{isSaving ? '正在保存…' : '保存站点设置'}</Button>
+            {status && <p className={`text-xs ${status === '站点设置已保存。' ? 'text-emerald-400' : 'text-rose-400'}`}>{status}</p>}
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
+
+export function SettingsPage({ user, cards, configs, onCardsChanged, onConfigsChanged }: SettingsPageProps) {
   const [accessCode, setAccessCode] = useState('')
   const [cardName, setCardName] = useState('')
   const [gameUserId, setGameUserId] = useState('')
@@ -56,7 +127,16 @@ export function SettingsPage({ user, cards, onCardsChanged }: SettingsPageProps)
   }
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="max-w-2xl">
+      <Tabs defaultSelectedKey="account" className="space-y-5">
+        <TabsList className="w-full justify-start overflow-x-auto bg-slate-900 border border-slate-800 p-1 rounded-xl">
+          <TabsTrigger id="account" className="min-w-fit rounded-lg px-3 text-slate-400 data-selected:text-white"><UserRound /> 账户</TabsTrigger>
+          <TabsTrigger id="cards" className="min-w-fit rounded-lg px-3 text-slate-400 data-selected:text-white"><CreditCard /> Aime 卡片</TabsTrigger>
+          <TabsTrigger id="terminals" className="min-w-fit rounded-lg px-3 text-slate-400 data-selected:text-white"><ServerCog /> 个人机台</TabsTrigger>
+          {user.isAdmin && <TabsTrigger id="site" className="min-w-fit rounded-lg px-3 text-slate-400 data-selected:text-white"><ServerCog /> 站点</TabsTrigger>}
+        </TabsList>
+
+        <TabsContent id="account">
       <Card className="bg-slate-900 border-slate-800">
         <CardHeader><CardTitle className="text-white">账户设置</CardTitle></CardHeader>
         <CardContent className="space-y-6">
@@ -79,7 +159,9 @@ export function SettingsPage({ user, cards, onCardsChanged }: SettingsPageProps)
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
 
+        <TabsContent id="cards">
       <Card className="bg-slate-900 border-slate-800">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2"><CreditCard className="text-indigo-400" /> Aime 卡片绑定</CardTitle>
@@ -122,7 +204,11 @@ export function SettingsPage({ user, cards, onCardsChanged }: SettingsPageProps)
           </section>
         </CardContent>
       </Card>
-      <PersonalTerminalPanel />
+        </TabsContent>
+
+        <TabsContent id="terminals"><PersonalTerminalPanel /></TabsContent>
+        {user.isAdmin && <TabsContent id="site"><SiteSettingsPanel configs={configs} onConfigsChanged={onConfigsChanged} /></TabsContent>}
+      </Tabs>
     </div>
   )
 }

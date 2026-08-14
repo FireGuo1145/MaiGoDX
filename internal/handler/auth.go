@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
@@ -38,16 +39,19 @@ func HandleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 生成验证 Token
-	tokenBytes := make([]byte, 16)
-	_, _ = rand.Read(tokenBytes)
-	verifyToken := hex.EncodeToString(tokenBytes)
+	verificationRequired := emailVerificationRequired()
+	verifyToken := ""
+	if verificationRequired {
+		tokenBytes := make([]byte, 16)
+		_, _ = rand.Read(tokenBytes)
+		verifyToken = hex.EncodeToString(tokenBytes)
+	}
 
 	account := model.UserAccount{
 		Email:        req.Email,
 		PasswordHash: string(hashed),
 		Username:     req.Username,
-		IsVerified:   false, // 默认未验证邮箱
+		IsVerified:   !verificationRequired,
 		VerifyToken:  verifyToken,
 	}
 
@@ -57,12 +61,14 @@ func HandleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 实际生产中会发送邮件，此处在响应中返回 verifyToken 以便测试验证
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":     true,
-		"message":     "注册成功，请查收验证邮件",
-		"verifyToken": verifyToken, // 开发与测试便利
-	})
+	response := map[string]interface{}{"success": true, "verificationRequired": verificationRequired}
+	if verificationRequired {
+		response["message"] = "注册成功，请查收验证邮件"
+		response["verifyToken"] = verifyToken // 开发与测试便利
+	} else {
+		response["message"] = "注册成功，现在可以直接登录"
+	}
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // HandleLogin 处理用户登录
@@ -89,7 +95,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !account.IsVerified {
+	if emailVerificationRequired() && !account.IsVerified {
 		w.WriteHeader(http.StatusForbidden)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": "邮箱尚未验证，请先完成验证"})
 		return
@@ -106,6 +112,34 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		"success": true, "message": "登录成功", "username": account.Username,
 		"email": account.Email, "isAdmin": account.IsAdmin,
 	})
+}
+
+// HandleGetPublicSiteSettings exposes only presentation/auth flags needed
+// before login; administrative game configuration remains protected.
+func HandleGetPublicSiteSettings(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":                  true,
+		"siteName":                 authConfigValue("site_name", "MaiGoDX"),
+		"requireEmailVerification": emailVerificationRequired(),
+	})
+}
+
+func emailVerificationRequired() bool {
+	value := strings.ToLower(authConfigValue("require_email_verification", "true"))
+	return value == "true" || value == "1" || value == "yes"
+}
+
+func authConfigValue(key, fallback string) string {
+	var config model.SystemConfig
+	if err := database.DB.Where("key = ?", key).First(&config).Error; err != nil {
+		return fallback
+	}
+	value := strings.TrimSpace(config.Value)
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 // HandleVerifyEmail 处理邮箱验证

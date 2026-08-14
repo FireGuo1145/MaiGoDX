@@ -98,6 +98,8 @@ func InitDB() {
 
 	// 系统初始化：以键为粒度补齐默认配置，保留管理员已经修改过的值。
 	defaultConfigs := []model.SystemConfig{
+		{Key: "site_name", Value: "MaiGoDX", Desc: "管理门户显示的站点名称与浏览器页面标题后缀"},
+		{Key: "require_email_verification", Value: "true", Desc: "注册后是否必须完成邮箱验证才允许登录 (true/false)"},
 		{Key: "maintenance_mode", Value: "false", Desc: "服务器全局维护模式开关 (true/false)"},
 		{Key: "event_mode", Value: "false", Desc: "限时活动模式开关 (true/false)"},
 		{Key: "notice_banner", Value: "欢迎来到 MaiGoDX 街机服务器！", Desc: "全服公告横幅内容"},

@@ -12,6 +12,15 @@ import { SetupPage } from '@/pages/SetupPage'
 import type { GameCharge, GameEvent, LoginResult, PageId, Stats, SystemConfig, Terminal, UserAccount, UserCard } from '@/types'
 import { apiErrorMessage } from '@/types'
 
+const pageTitles: Record<PageId, string> = {
+  home: '主页',
+  dashboard: '概览',
+  maimai: 'maimai DX',
+  setup: '接入指南',
+  admin: '管理后台',
+  settings: '设置',
+}
+
 const pagePaths: Record<PageId, string> = {
   home: '/',
   dashboard: '/dashboard',
@@ -45,6 +54,7 @@ export default function App() {
   const [cards, setCards] = useState<UserCard[]>([])
   const [users, setUsers] = useState<UserAccount[]>([])
   const [configs, setConfigs] = useState<SystemConfig[]>([])
+  const [siteName, setSiteName] = useState('MaiGoDX')
   const [terminals, setTerminals] = useState<Terminal[]>([])
   const [events, setEvents] = useState<GameEvent[]>([])
   const [charges, setCharges] = useState<GameCharge[]>([])
@@ -52,7 +62,17 @@ export default function App() {
   const navigate = useNavigate()
   const page = pageFromPath(location.pathname)
 
+  const refreshSiteSettings = async () => {
+    try {
+      const result = await api.getSiteSettings()
+      if (result.success) setSiteName(result.siteName?.trim() || 'MaiGoDX')
+    } catch (error) {
+      console.error('Failed to load public site settings:', apiErrorMessage(error))
+    }
+  }
+
   useEffect(() => {
+    void refreshSiteSettings()
     let active = true
     void api.currentUser()
       .then((result) => {
@@ -64,6 +84,10 @@ export default function App() {
       })
     return () => { active = false }
   }, [])
+
+  useEffect(() => {
+    document.title = `${user ? pageTitles[page] : '登录'} - ${siteName}`
+  }, [page, siteName, user])
 
   const refreshStats = async (cardID = selectedProfileCardID) => {
     if (!user) return
@@ -131,6 +155,10 @@ export default function App() {
     }
   }
 
+  const refreshAdminConfigs = async () => {
+    await Promise.all([refreshConfigs(), refreshSiteSettings()])
+  }
+
   useEffect(() => {
     if (!user) return
     void refreshStats()
@@ -163,7 +191,7 @@ export default function App() {
   }
 
   if (!user) {
-    return <AuthPage onAuthenticated={(account) => { setUser(account); navigate('/dashboard', { replace: true }) }} />
+    return <AuthPage siteName={siteName} onAuthenticated={(account) => { setUser(account); navigate('/dashboard', { replace: true }) }} />
   }
 
   return (
@@ -183,11 +211,11 @@ export default function App() {
         <Route path="/dashboard" element={<DashboardPage stats={stats} />} />
         <Route path="/maimai" element={<MaimaiPage stats={stats} onProfileChanged={() => refreshStats(selectedProfileCardID)} />} />
         <Route path="/setup" element={<SetupPage />} />
-        <Route path="/settings" element={<SettingsPage user={user} cards={cards} onCardsChanged={refreshCards} />} />
+        <Route path="/settings" element={<SettingsPage user={user} cards={cards} configs={configs} onCardsChanged={refreshCards} onConfigsChanged={refreshAdminConfigs} />} />
         <Route
           path="/admin"
           element={user.isAdmin
-            ? <AdminPage users={users} configs={configs} terminals={terminals} events={events} charges={charges} onUsersChanged={refreshUsers} onConfigsChanged={refreshConfigs} onTerminalsChanged={refreshTerminals} onEventsChanged={refreshEvents} onChargesChanged={refreshCharges} />
+            ? <AdminPage users={users} configs={configs} terminals={terminals} events={events} charges={charges} onUsersChanged={refreshUsers} onConfigsChanged={refreshAdminConfigs} onTerminalsChanged={refreshTerminals} onEventsChanged={refreshEvents} onChargesChanged={refreshCharges} />
             : <Navigate to="/" replace />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />

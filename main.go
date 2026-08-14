@@ -30,6 +30,7 @@ func main() {
 	mux.HandleFunc("/api/auth/me", handler.HandleCurrentUser)
 	mux.HandleFunc("/api/auth/logout", handler.HandleLogout)
 	mux.HandleFunc("/api/auth/verify", handler.HandleVerifyEmail)
+	mux.HandleFunc("/api/site", handler.HandleGetPublicSiteSettings)
 	mux.HandleFunc("/api/terminal/list", handler.HandleUserTerminals)
 	mux.HandleFunc("/api/terminal/create", handler.HandleCreateUserTerminal)
 	mux.HandleFunc("/api/terminal/update", handler.HandleUpdateUserTerminal)

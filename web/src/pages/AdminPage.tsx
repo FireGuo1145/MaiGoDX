@@ -74,7 +74,7 @@ export function AdminPage({ users, configs, terminals, events, charges, onUsersC
         <Card className="bg-slate-900 border-slate-800 overflow-hidden">
           <Table>
             <TableHeader className="bg-slate-800/50">
-                <TableHead className="text-slate-300">用户</TableHead>
+                <TableHead isRowHeader className="text-slate-300">用户</TableHead>
                 <TableHead className="text-slate-300">状态</TableHead>
                 <TableHead className="text-slate-300">角色</TableHead>
             </TableHeader>

@@ -6,6 +6,7 @@ import { apiErrorMessage, DEFAULT_ADMIN_EMAIL } from '@/types'
 
 interface AuthPageProps {
   onAuthenticated: (user: UserAccount) => void
+  siteName: string
 }
 
 const copy: Record<AuthMode, { title: string; description: string }> = {
@@ -24,7 +25,7 @@ function noticeForLogin(result: LoginResult): UserAccount {
   }
 }
 
-export function AuthPage({ onAuthenticated }: AuthPageProps) {
+export function AuthPage({ onAuthenticated, siteName }: AuthPageProps) {
   const [mode, setMode] = useState<AuthMode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -59,8 +60,13 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     try {
       const result = await api.register(email, password, username)
       if (!result.success) throw new Error(result.message || '注册失败')
-      setNotice({ text: '注册成功！请继续完成邮箱验证。', developmentToken: result.verifyToken })
-      setMode('verify')
+      if (result.verificationRequired !== false) {
+        setNotice({ text: '注册成功！请继续完成邮箱验证。', developmentToken: result.verifyToken })
+        setMode('verify')
+      } else {
+        setNotice({ text: '注册成功，现在可以直接登录。' })
+        setMode('login')
+      }
     } catch (error) {
       showError(error)
     } finally {
@@ -91,7 +97,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-[400px] space-y-8">
         <div className="text-center">
-          <h1 className="text-4xl font-black tracking-tighter text-indigo-500">MaiGoDX</h1>
+          <h1 className="text-4xl font-black tracking-tighter text-indigo-500">{siteName}</h1>
           <p className="text-slate-400 mt-2">街机游戏服务器管理门户</p>
         </div>
 
