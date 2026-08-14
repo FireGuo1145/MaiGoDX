@@ -5,6 +5,7 @@ import {
   type ApiResult,
   type CardsResult,
   type ConfigsResult,
+  type FunctionTicketAdjust,
   type LoginResult,
   type ProfileUpdate,
   type RegisterResult,
@@ -21,6 +22,7 @@ import {
 export const api = {
   getStats: (cardId?: number) => getJson<StatsResult>(cardId ? `${API_PATHS.stats}?cardId=${cardId}` : API_PATHS.stats),
   updateProfile: (profile: ProfileUpdate) => postJson<ApiResult>(API_PATHS.updateProfile, profile),
+  adjustFunctionTicket: (ticket: FunctionTicketAdjust) => postJson<ApiResult>(API_PATHS.adjustTicket, ticket),
   login: (email: string, password: string) => postJson<LoginResult>(API_PATHS.login, { email, password }),
   currentUser: () => getJson<LoginResult>(API_PATHS.me),
   register: (email: string, password: string, username: string) =>

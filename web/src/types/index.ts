@@ -95,6 +95,12 @@ export interface ProfileUpdate {
   regions: Region[]
 }
 
+export interface FunctionTicketAdjust {
+  cardId: number
+  itemId: number
+  amount: number
+}
+
 export interface SongComp {
   musicId: number
   level: number
@@ -175,6 +181,7 @@ export interface AuthNotice {
 export const API_PATHS = {
   stats: '/api/stats',
   updateProfile: '/api/maimai/profile/update',
+  adjustTicket: '/api/maimai/profile/ticket/adjust',
   login: '/api/auth/login',
   me: '/api/auth/me',
   register: '/api/auth/register',

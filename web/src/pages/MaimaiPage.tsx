@@ -27,6 +27,9 @@ export function MaimaiPage({ stats, cards, selectedCardID: selectedCardIDProp, o
   const [regionText, setRegionText] = useState('')
   const [profileError, setProfileError] = useState('')
   const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [ticketItemID, setTicketItemID] = useState('1')
+  const [ticketGrantError, setTicketGrantError] = useState('')
+  const [isGrantingTicket, setIsGrantingTicket] = useState(false)
   const profileCards = cards.filter((card) => card.gameUserId > 0)
   const selectedCardID = selectedCardIDProp || stats?.selectedCardId || profileCards[0]?.ID || 0
 
@@ -59,6 +62,19 @@ export function MaimaiPage({ stats, cards, selectedCardID: selectedCardIDProp, o
     }
   }
 
+  const grantTicket = async (amount: number) => {
+    try {
+      setIsGrantingTicket(true)
+      setTicketGrantError('')
+      await api.adjustFunctionTicket({ cardId: selectedCardID, itemId: parseInteger(ticketItemID, '功能票 ID'), amount })
+      await onProfileChanged()
+    } catch (error) {
+      setTicketGrantError(apiErrorMessage(error))
+    } finally {
+      setIsGrantingTicket(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {profileCards.length > 1 ? (
@@ -81,7 +97,7 @@ export function MaimaiPage({ stats, cards, selectedCardID: selectedCardIDProp, o
           <Card className="bg-slate-900 border-slate-800 overflow-hidden">
             <Table>
               <TableHeader className="bg-slate-800/50">
-                  <TableHead className="text-slate-300">乐曲</TableHead>
+                  <TableHead isRowHeader className="text-slate-300">乐曲</TableHead>
                   <TableHead className="text-slate-300">难度</TableHead>
                   <TableHead className="text-slate-300 text-right">达成率</TableHead>
                   <TableHead className="text-slate-300 text-right">分数</TableHead>
@@ -164,6 +180,13 @@ export function MaimaiPage({ stats, cards, selectedCardID: selectedCardIDProp, o
             headers={['票种 ID', '库存']}
             rows={functionTickets.map((ticket) => [ticket.itemId, ticket.stock])}
           />
+          <TicketGrantPanel
+            itemID={ticketItemID}
+            onItemIDChange={setTicketItemID}
+            onGrant={grantTicket}
+            error={ticketGrantError}
+            isGranting={isGrantingTicket}
+          />
           <ProfileTable
             title="区域游玩记录"
             empty="尚无区域游玩记录。"
@@ -226,6 +249,33 @@ function parseRows(value: string, width: number, label: string): number[][] {
   })
 }
 
+interface TicketGrantPanelProps {
+  itemID: string
+  onItemIDChange: (value: string) => void
+  onGrant: (amount: number) => Promise<void>
+  error: string
+  isGranting: boolean
+}
+
+function TicketGrantPanel({ itemID, onItemIDChange, onGrant, error, isGranting }: TicketGrantPanelProps) {
+  return (
+    <Card className="space-y-3 border-emerald-500/30 bg-slate-900 p-5">
+      <div>
+        <p className="font-bold text-white">快速发放功能票</p>
+        <p className="mt-1 text-xs text-slate-500">直接为当前选中的 Aime 档案增加指定票种库存。</p>
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="block text-sm text-slate-300">
+          票种 ID
+          <input value={itemID} onChange={(event) => onItemIDChange(event.target.value)} inputMode="numeric" className="mt-1 block w-28 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-emerald-500" />
+        </label>
+        {[1, 5, 10].map((amount) => <Button key={amount} variant="secondary" onPress={() => void onGrant(amount)} isDisabled={isGranting}>+{amount}</Button>)}
+      </div>
+      {error && <p className="text-sm text-red-400">{error}</p>}
+    </Card>
+  )
+}
+
 interface ProfileTableProps {
   title: string
   headers: string[]
@@ -239,7 +289,7 @@ function ProfileTable({ title, headers, rows, empty }: ProfileTableProps) {
       <div className="border-b border-slate-800 px-5 py-4 text-sm font-bold text-white">{title}</div>
       <Table>
         <TableHeader className="bg-slate-800/50">
-          {headers.map((header) => <TableHead key={header} className="text-slate-300">{header}</TableHead>)}
+          {headers.map((header, index) => <TableHead key={header} isRowHeader={index === 0} className="text-slate-300">{header}</TableHead>)}
         </TableHeader>
         <TableBody>
           {rows.length ? rows.map((row, index) => (

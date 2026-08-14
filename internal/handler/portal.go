@@ -54,6 +54,12 @@ type portalProfileUpdateRequest struct {
 	Regions         []portalRegion         `json:"regions"`
 }
 
+type portalFunctionTicketAdjustRequest struct {
+	CardID uint `json:"cardId"`
+	ItemID int  `json:"itemId"`
+	Amount int  `json:"amount"`
+}
+
 // HandleGetStats returns only persisted game data. It deliberately does not invent a
 // profile, rating, trend, or ranking when no maimai record is associated with the account.
 func HandleGetStats(w http.ResponseWriter, r *http.Request) {
@@ -144,6 +150,35 @@ func HandleUpdatePortalProfile(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "message": "游戏档案已保存"})
 }
 
+// HandleAdjustPortalFunctionTicket grants function tickets to the selected
+// card profile without requiring the user to rewrite the whole inventory.
+func HandleAdjustPortalFunctionTicket(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	account, ok := requireAccount(w, r)
+	if !ok {
+		return
+	}
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var request portalFunctionTicketAdjustRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.ItemID <= 0 || request.Amount <= 0 || request.Amount > 9999 {
+		writePortalUpdateError(w, http.StatusBadRequest, "功能票 ID 和发放数量必须有效")
+		return
+	}
+	detail, err := portalDetailForAccount(account.ID, request.CardID)
+	if err != nil {
+		writePortalUpdateError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if err := adjustPortalFunctionTicket(detail.UserID, request.ItemID, request.Amount); err != nil {
+		writePortalUpdateError(w, http.StatusInternalServerError, "功能票发放失败")
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "message": "功能票已发放"})
+}
+
 func writePortalUpdateError(w http.ResponseWriter, status int, message string) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": message})
@@ -189,13 +224,13 @@ func savePortalProfile(detail model.UserDetail, request portalProfileUpdateReque
 		if err := tx.Model(&model.UserDetail{}).Where("user_id = ?", detail.UserID).Update("partner_id", request.PartnerID).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("user_id = ?", detail.UserID).Delete(&model.UserIntimate{}).Error; err != nil {
+		if err := tx.Unscoped().Where("user_id = ?", detail.UserID).Delete(&model.UserIntimate{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("user_id = ? AND item_kind = ?", detail.UserID, 12).Delete(&model.UserItem{}).Error; err != nil {
+		if err := tx.Unscoped().Where("user_id = ? AND item_kind = ?", detail.UserID, 12).Delete(&model.UserItem{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("user_id = ?", detail.UserID).Delete(&model.UserRegion{}).Error; err != nil {
+		if err := tx.Unscoped().Where("user_id = ?", detail.UserID).Delete(&model.UserRegion{}).Error; err != nil {
 			return err
 		}
 		for _, value := range request.TravelPartners {
@@ -214,6 +249,22 @@ func savePortalProfile(detail model.UserDetail, request portalProfileUpdateReque
 			}
 		}
 		return nil
+	})
+}
+
+func adjustPortalFunctionTicket(userID int64, itemID, amount int) error {
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		var ticket model.UserItem
+		err := tx.Where("user_id = ? AND item_kind = ? AND item_id = ?", userID, 12, itemID).First(&ticket).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return tx.Create(&model.UserItem{UserID: userID, ItemKind: 12, ItemID: itemID, Stock: amount, IsValid: true}).Error
+		}
+		if err != nil {
+			return err
+		}
+		ticket.Stock += amount
+		ticket.IsValid = true
+		return tx.Save(&ticket).Error
 	})
 }
 

@@ -88,3 +88,17 @@ func TestPortalProfileSelectionIsScopedToBoundCard(t *testing.T) {
 		t.Fatal("unowned card selection should fail")
 	}
 }
+
+func TestAdjustPortalFunctionTicketCreatesAndIncrements(t *testing.T) {
+	setupMaimaiTestDB(t)
+	if err := adjustPortalFunctionTicket(12, 4, 5); err != nil {
+		t.Fatalf("create ticket: %v", err)
+	}
+	if err := adjustPortalFunctionTicket(12, 4, 10); err != nil {
+		t.Fatalf("increment ticket: %v", err)
+	}
+	tickets := portalFunctionTickets(12)
+	if len(tickets) != 1 || tickets[0].ItemID != 4 || tickets[0].Stock != 15 {
+		t.Fatalf("tickets=%v", tickets)
+	}
+}
