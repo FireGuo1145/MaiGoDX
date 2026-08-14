@@ -160,23 +160,18 @@ func writeAimeDBResponse(writer io.Writer, response []byte, encrypted bool) erro
 	if len(response) < 0x20 {
 		return fmt.Errorf("invalid AimeDB response size %d", len(response))
 	}
-	// Always ensure the response is padded to AES block size before encryption
-	finalSize := len(response)
-	if finalSize%aes.BlockSize != 0 {
-		finalSize += aes.BlockSize - (finalSize % aes.BlockSize)
-	}
-	paddedResponse := make([]byte, finalSize)
-	copy(paddedResponse, response)
+	// AquaDX: msg.writerIndex(0); msg.writeShortLE(0xa13e); msg.writeShortLE(0x3087); msg.setShortLE(0x0006, msg.capacity())
+	// This means we must write the header to the ORIGINAL buffer, and the length field uses the FULL buffer capacity.
+	binary.LittleEndian.PutUint16(response[0x00:0x02], 0xa13e)
+	binary.LittleEndian.PutUint16(response[0x02:0x04], 0x3087)
+	binary.LittleEndian.PutUint16(response[0x06:0x08], uint16(len(response)))
 
-	// Write standard AimeDB header to the PADDED buffer
-	binary.LittleEndian.PutUint16(paddedResponse[0x00:0x02], 0xa13e)
-	binary.LittleEndian.PutUint16(paddedResponse[0x02:0x04], 0x3087)
-	binary.LittleEndian.PutUint16(paddedResponse[0x06:0x08], uint16(finalSize))
-
-	payload := paddedResponse
+	payload := response
 	if encrypted {
 		var err error
-		payload, err = cryptAimeDB(paddedResponse, true)
+		// AquaDX: AimeDbEncryption.encrypt(msg) calls doFinal(src.toAllBytes())
+		// which processes the entire capacity of the buffer.
+		payload, err = cryptAimeDB(response, true)
 		if err != nil {
 			return err
 		}
@@ -186,28 +181,20 @@ func writeAimeDBResponse(writer io.Writer, response []byte, encrypted bool) erro
 }
 
 func cryptAimeDB(source []byte, encrypt bool) ([]byte, error) {
-	if len(source) == 0 {
-		return nil, errors.New("AimeDB payload must be non-empty")
+	if len(source) == 0 || len(source)%aes.BlockSize != 0 {
+		return nil, fmt.Errorf("AimeDB payload must be a non-empty multiple of %d bytes for ECB", aes.BlockSize)
 	}
 	block, err := aes.NewCipher([]byte(aimeDBKey))
 	if err != nil {
 		return nil, err
 	}
-	// AimeDB uses ECB mode, so we process block by block.
-	// If the last block is partial, it is not encrypted/decrypted in standard ECB,
-	// but AimeDB protocol length might not be a multiple of 16.
 	result := make([]byte, len(source))
-	fullBlocks := (len(source) / aes.BlockSize) * aes.BlockSize
-	for offset := 0; offset < fullBlocks; offset += aes.BlockSize {
+	for offset := 0; offset < len(source); offset += aes.BlockSize {
 		if encrypt {
 			block.Encrypt(result[offset:offset+aes.BlockSize], source[offset:offset+aes.BlockSize])
 		} else {
 			block.Decrypt(result[offset:offset+aes.BlockSize], source[offset:offset+aes.BlockSize])
 		}
-	}
-	// Copy any remaining bytes as-is (though typically protocol frames are padded to 16)
-	if fullBlocks < len(source) {
-		copy(result[fullBlocks:], source[fullBlocks:])
 	}
 	return result, nil
 }
@@ -221,7 +208,7 @@ func handleAimeDBRequest(requestType uint16, request []byte) ([]byte, string, er
 	case 0x05:
 		return aimeRegister(request)
 	case 0x09:
-		return aimeStaticResponse(0x20, 0x0a, 1), "log", nil
+		return aimeStaticResponse(0x30, 0x0a, 1), "log", nil
 	case 0x0b:
 		return aimeStaticResponse(0x200, 0x0c, 1), "campaign", nil
 	case 0x0d:
@@ -236,7 +223,7 @@ func handleAimeDBRequest(requestType uint16, request []byte) ([]byte, string, er
 	case 0x13:
 		return aimeStaticResponse(0x40, 0x14, 1), "unknown-19", nil
 	case 0x64:
-		return aimeStaticResponse(0x20, 0x65, 1), "hello", nil
+		return aimeStaticResponse(0x30, 0x65, 1), "hello", nil
 	case 0x66:
 		return nil, "goodbye", nil
 	default:
@@ -341,6 +328,9 @@ func aimeFelicaAccessCode(request []byte, offset int) (string, error) {
 }
 
 func aimeStaticResponse(size int, responseCode, status uint16) []byte {
+	if size%aes.BlockSize != 0 {
+		size += aes.BlockSize - (size % aes.BlockSize)
+	}
 	response := make([]byte, size)
 	binary.LittleEndian.PutUint16(response[0x04:0x06], responseCode)
 	binary.LittleEndian.PutUint16(response[0x08:0x0a], status)
