@@ -39,7 +39,7 @@ function accountFromSession(result: LoginResult): UserAccount {
 export default function App() {
   const [user, setUser] = useState<UserAccount | null>(null)
   const [isAuthReady, setIsAuthReady] = useState(false)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768)
   const [stats, setStats] = useState<Stats | null>(null)
   const [selectedProfileCardID, setSelectedProfileCardID] = useState<number | undefined>()
   const [cards, setCards] = useState<UserCard[]>([])
@@ -69,7 +69,10 @@ export default function App() {
     if (!user) return
     try {
       const result = await api.getStats(cardID)
-      if (result.success) setStats(result)
+      if (result.success) {
+        setStats(result)
+        if (!cardID && result.selectedCardId) setSelectedProfileCardID(result.selectedCardId)
+      }
     } catch (error) {
       console.error('Failed to load stats:', apiErrorMessage(error))
     }
@@ -171,11 +174,14 @@ export default function App() {
       onNavigate={(target) => navigate(pagePaths[target])}
       onToggleSidebar={() => setIsSidebarOpen((open) => !open)}
       onLogout={logout}
+      cards={cards}
+      selectedProfileCardID={selectedProfileCardID || stats?.selectedCardId}
+      onProfileCardSelected={(cardID) => { setSelectedProfileCardID(cardID); void refreshStats(cardID) }}
     >
       <Routes>
         <Route path="/" element={<HomePage stats={stats} />} />
         <Route path="/dashboard" element={<DashboardPage stats={stats} />} />
-        <Route path="/maimai" element={<MaimaiPage stats={stats} cards={cards} selectedCardID={selectedProfileCardID} onProfileChanged={() => refreshStats(selectedProfileCardID)} onCardSelected={(cardID) => { setSelectedProfileCardID(cardID); void refreshStats(cardID) }} />} />
+        <Route path="/maimai" element={<MaimaiPage stats={stats} onProfileChanged={() => refreshStats(selectedProfileCardID)} />} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/settings" element={<SettingsPage user={user} cards={cards} onCardsChanged={refreshCards} />} />
         <Route
