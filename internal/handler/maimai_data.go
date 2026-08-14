@@ -73,6 +73,9 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 	case "GetUserCharacter", "CMGetUserCharacter":
 		var values []model.UserCharacter
 		database.DB.Where("user_id = ?", userID).Find(&values)
+		if len(values) == 0 {
+			values = defaultSlotCharacters(userID)
+		}
 		if apiName == "CMGetUserCharacter" {
 			return map[string]interface{}{"returnCode": 1, "length": len(values), "userCharacterList": values}, true, nil
 		}
@@ -267,9 +270,52 @@ func maimaiUserDataPayload(detail model.UserDetail) interface{} {
 		CharaLockSlot []int `json:"charaLockSlot"`
 	}{
 		UserDetail:    detail,
-		CharaSlot:     []int{},
-		CharaLockSlot: []int{},
+		CharaSlot:     safeCharaSlot(detail.CharaSlot),
+		CharaLockSlot: safeCharaLockSlot(detail.CharaLockSlot),
 	}
+}
+
+// SDGA 1.60 indexes five character slots during character select and map
+// result. Old profiles did not persist these fields, so repair their wire
+// representation with the game's starter character IDs instead of emitting an
+// empty/zero-length collection.
+func safeCharaSlot(value model.IntList) []int {
+	if len(value) == 5 {
+		valid := true
+		for _, id := range value {
+			valid = valid && id > 0
+		}
+		if valid {
+			return []int(value)
+		}
+	}
+	return []int{101, 102, 103, 104, 105}
+}
+
+func safeCharaLockSlot(value model.IntList) []int {
+	if len(value) == 5 {
+		valid := true
+		for _, lock := range value {
+			valid = valid && lock >= 0
+		}
+		if valid {
+			return []int(value)
+		}
+	}
+	return []int{0, 0, 0, 0, 0}
+}
+
+func defaultSlotCharacters(userID int64) []model.UserCharacter {
+	var detail model.UserDetail
+	if err := database.DB.Where("user_id = ?", userID).First(&detail).Error; err != nil {
+		return []model.UserCharacter{}
+	}
+	slots := safeCharaSlot(detail.CharaSlot)
+	values := make([]model.UserCharacter, 0, len(slots))
+	for _, characterID := range slots {
+		values = append(values, model.UserCharacter{UserID: userID, CharacterID: characterID, Level: 1})
+	}
+	return values
 }
 
 // unpagedMaimaiPayload mirrors AquaDX's BaseHandler.unpaged response framing.

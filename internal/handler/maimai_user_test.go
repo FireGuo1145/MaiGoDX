@@ -219,11 +219,30 @@ func TestGetUserDataUsesAquaDXRatingAndCharacterSlotFields(t *testing.T) {
 		t.Fatalf("decode user data: %v", err)
 	}
 	userData := payload["userData"].(map[string]interface{})
-	if userData["playerRating"] != float64(12345) || userData["highestRating"] != float64(12400) || userData["currentPlayCount"] != float64(7) || userData["charaSlot"] == nil || userData["charaLockSlot"] == nil {
+	if userData["playerRating"] != float64(12345) || userData["highestRating"] != float64(12400) || userData["currentPlayCount"] != float64(7) || len(userData["charaSlot"].([]interface{})) != 5 || len(userData["charaLockSlot"].([]interface{})) != 5 {
 		t.Fatalf("userData shape=%v", userData)
 	}
 	if userData["rating"] != nil || userData["userId"] != nil {
 		t.Fatalf("legacy fields leaked into userData: %v", userData)
+	}
+}
+
+func TestUserDataPersistsAndRepairsCharacterSlots(t *testing.T) {
+	setupMaimaiTestDB(t)
+	request := model.UpsertUserAllRequest{UserID: 602}
+	request.UpsertUserAll.UserData = []model.UserDetail{{UserName: "Slots", CharaSlot: model.IntList{400101, 101, 102, 103, 104}, CharaLockSlot: model.IntList{0, 1, 0, 0, 0}}}
+	if err := UpsertUserAll(request); err != nil {
+		t.Fatalf("persist slots: %v", err)
+	}
+	var detail model.UserDetail
+	if err := database.DB.Where("user_id = ?", 602).First(&detail).Error; err != nil {
+		t.Fatalf("load slots: %v", err)
+	}
+	if len(detail.CharaSlot) != 5 || detail.CharaSlot[0] != 400101 || len(detail.CharaLockSlot) != 5 || detail.CharaLockSlot[1] != 1 {
+		t.Fatalf("saved slots=%v locks=%v", detail.CharaSlot, detail.CharaLockSlot)
+	}
+	if repaired := safeCharaSlot(model.IntList{0, 0, 0, 0, 0}); len(repaired) != 5 || repaired[0] != 101 {
+		t.Fatalf("repaired slots=%v", repaired)
 	}
 }
 

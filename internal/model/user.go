@@ -2,98 +2,134 @@ package model
 
 import (
 	"bytes"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 
 	"gorm.io/gorm"
 )
 
+// IntList stores a maimai integer list as JSON in a portable text column while
+// remaining a normal JSON array on the game protocol.
+type IntList []int
+
+func (v IntList) Value() (driver.Value, error) {
+	encoded, err := json.Marshal([]int(v))
+	if err != nil {
+		return nil, err
+	}
+	return string(encoded), nil
+}
+
+func (v *IntList) Scan(value interface{}) error {
+	if value == nil {
+		*v = nil
+		return nil
+	}
+	var raw []byte
+	switch source := value.(type) {
+	case []byte:
+		raw = source
+	case string:
+		raw = []byte(source)
+	default:
+		return fmt.Errorf("cannot scan IntList from %T", value)
+	}
+	if len(raw) == 0 {
+		*v = nil
+		return nil
+	}
+	return json.Unmarshal(raw, v)
+}
+
 // UserDetail persists a maimai player profile. UserID is the game card external ID.
 type UserDetail struct {
 	gorm.Model               `json:"-"`
-	UserID                   int64  `gorm:"uniqueIndex;not null" json:"-"`
-	UserName                 string `json:"userName"`
-	IsNetMember              int    `json:"isNetMember"`
-	EquipGlassesID           int    `json:"-"`
-	EquipBackGroundID        int    `json:"-"`
-	EquipNamePlateID         int    `json:"-"`
-	EquipFrameID             int    `json:"-"`
-	EquipIconID              int    `json:"-"`
-	IconID                   int    `json:"iconId"`
-	PlateID                  int    `json:"plateId"`
-	TitleID                  int    `json:"titleId"`
-	PartnerID                int    `json:"partnerId"`
-	FrameID                  int    `json:"frameId"`
-	SelectMapID              int    `json:"selectMapId"`
-	TotalAwake               int    `json:"totalAwake"`
-	GradeRating              int    `json:"gradeRating"`
-	MusicRating              int    `json:"musicRating"`
-	Rating                   int    `json:"playerRating"`
-	MaxRating                int    `json:"highestRating"`
-	GradeRank                int    `json:"gradeRank"`
-	ClassRank                int    `json:"classRank"`
-	CourseRank               int    `json:"courseRank"`
-	ContentBit               int64  `json:"contentBit"`
-	PlayCount                int    `json:"playCount"`
-	CurrentPlayCount         int    `json:"currentPlayCount"`
-	RenameCredit             int    `json:"renameCredit"`
-	MapStock                 int    `json:"mapStock"`
-	EventWatchedDate         string `json:"eventWatchedDate"`
-	LastGameID               string `json:"lastGameId"`
-	LastRomVersion           string `json:"lastRomVersion"`
-	LastDataVersion          string `json:"lastDataVersion"`
-	LastLoginDate            string `json:"lastLoginDate"`
-	LastPlayDate             string `json:"lastPlayDate"`
-	LastPlayCredit           int    `json:"lastPlayCredit"`
-	LastPlayMode             int    `json:"lastPlayMode"`
-	LastPlaceID              int    `json:"lastPlaceId"`
-	LastPlaceName            string `json:"lastPlaceName"`
-	LastAllNetID             int    `json:"lastAllNetId"`
-	LastRegionID             int    `json:"lastRegionId"`
-	LastRegionName           string `json:"lastRegionName"`
-	LastClientID             string `json:"lastClientId"`
-	LastCountryCode          string `json:"lastCountryCode"`
-	LastSelectEMoney         int    `json:"lastSelectEMoney"`
-	LastSelectTicket         int    `json:"lastSelectTicket"`
-	LastSelectCourse         int    `json:"lastSelectCourse"`
-	LastCountCourse          int    `json:"lastCountCourse"`
-	FirstGameID              string `json:"firstGameId"`
-	FirstRomVersion          string `json:"firstRomVersion"`
-	FirstDataVersion         string `json:"firstDataVersion"`
-	FirstPlayDate            string `json:"firstPlayDate"`
-	CompatibleCMVersion      string `json:"compatibleCmVersion"`
-	DailyBonusDate           string `json:"dailyBonusDate"`
-	DailyCourseBonusDate     string `json:"dailyCourseBonusDate"`
-	LastPairLoginDate        string `json:"lastPairLoginDate"`
-	LastTrialPlayDate        string `json:"lastTrialPlayDate"`
-	PlayVsCount              int    `json:"playVsCount"`
-	PlaySyncCount            int    `json:"playSyncCount"`
-	WinCount                 int    `json:"winCount"`
-	HelpCount                int    `json:"helpCount"`
-	ComboCount               int    `json:"comboCount"`
-	TotalPoint               int64  `json:"totalPoint"`
-	TotalDeluxScore          int64  `json:"totalDeluxscore"`
-	TotalBasicDeluxScore     int64  `json:"totalBasicDeluxscore"`
-	TotalAdvancedDeluxScore  int64  `json:"totalAdvancedDeluxscore"`
-	TotalExpertDeluxScore    int64  `json:"totalExpertDeluxscore"`
-	TotalMasterDeluxScore    int64  `json:"totalMasterDeluxscore"`
-	TotalReMasterDeluxScore  int64  `json:"totalReMasterDeluxscore"`
-	TotalSync                int    `json:"totalSync"`
-	TotalBasicSync           int    `json:"totalBasicSync"`
-	TotalAdvancedSync        int    `json:"totalAdvancedSync"`
-	TotalExpertSync          int    `json:"totalExpertSync"`
-	TotalMasterSync          int    `json:"totalMasterSync"`
-	TotalReMasterSync        int    `json:"totalReMasterSync"`
-	TotalAchievement         int64  `json:"totalAchievement"`
-	TotalBasicAchievement    int64  `json:"totalBasicAchievement"`
-	TotalAdvancedAchievement int64  `json:"totalAdvancedAchievement"`
-	TotalExpertAchievement   int64  `json:"totalExpertAchievement"`
-	TotalMasterAchievement   int64  `json:"totalMasterAchievement"`
-	TotalReMasterAchievement int64  `json:"totalReMasterAchievement"`
-	PlayerOldRating          int64  `json:"playerOldRating"`
-	PlayerNewRating          int64  `json:"playerNewRating"`
-	DateTime                 int64  `json:"dateTime"`
-	Point                    int    `json:"point"`
+	UserID                   int64   `gorm:"uniqueIndex;not null" json:"-"`
+	UserName                 string  `json:"userName"`
+	IsNetMember              int     `json:"isNetMember"`
+	EquipGlassesID           int     `json:"-"`
+	EquipBackGroundID        int     `json:"-"`
+	EquipNamePlateID         int     `json:"-"`
+	EquipFrameID             int     `json:"-"`
+	EquipIconID              int     `json:"-"`
+	IconID                   int     `json:"iconId"`
+	PlateID                  int     `json:"plateId"`
+	TitleID                  int     `json:"titleId"`
+	PartnerID                int     `json:"partnerId"`
+	FrameID                  int     `json:"frameId"`
+	SelectMapID              int     `json:"selectMapId"`
+	TotalAwake               int     `json:"totalAwake"`
+	GradeRating              int     `json:"gradeRating"`
+	MusicRating              int     `json:"musicRating"`
+	Rating                   int     `json:"playerRating"`
+	MaxRating                int     `json:"highestRating"`
+	GradeRank                int     `json:"gradeRank"`
+	ClassRank                int     `json:"classRank"`
+	CourseRank               int     `json:"courseRank"`
+	CharaSlot                IntList `gorm:"type:text" json:"charaSlot"`
+	CharaLockSlot            IntList `gorm:"type:text" json:"charaLockSlot"`
+	ContentBit               int64   `json:"contentBit"`
+	PlayCount                int     `json:"playCount"`
+	CurrentPlayCount         int     `json:"currentPlayCount"`
+	RenameCredit             int     `json:"renameCredit"`
+	MapStock                 int     `json:"mapStock"`
+	EventWatchedDate         string  `json:"eventWatchedDate"`
+	LastGameID               string  `json:"lastGameId"`
+	LastRomVersion           string  `json:"lastRomVersion"`
+	LastDataVersion          string  `json:"lastDataVersion"`
+	LastLoginDate            string  `json:"lastLoginDate"`
+	LastPlayDate             string  `json:"lastPlayDate"`
+	LastPlayCredit           int     `json:"lastPlayCredit"`
+	LastPlayMode             int     `json:"lastPlayMode"`
+	LastPlaceID              int     `json:"lastPlaceId"`
+	LastPlaceName            string  `json:"lastPlaceName"`
+	LastAllNetID             int     `json:"lastAllNetId"`
+	LastRegionID             int     `json:"lastRegionId"`
+	LastRegionName           string  `json:"lastRegionName"`
+	LastClientID             string  `json:"lastClientId"`
+	LastCountryCode          string  `json:"lastCountryCode"`
+	LastSelectEMoney         int     `json:"lastSelectEMoney"`
+	LastSelectTicket         int     `json:"lastSelectTicket"`
+	LastSelectCourse         int     `json:"lastSelectCourse"`
+	LastCountCourse          int     `json:"lastCountCourse"`
+	FirstGameID              string  `json:"firstGameId"`
+	FirstRomVersion          string  `json:"firstRomVersion"`
+	FirstDataVersion         string  `json:"firstDataVersion"`
+	FirstPlayDate            string  `json:"firstPlayDate"`
+	CompatibleCMVersion      string  `json:"compatibleCmVersion"`
+	DailyBonusDate           string  `json:"dailyBonusDate"`
+	DailyCourseBonusDate     string  `json:"dailyCourseBonusDate"`
+	LastPairLoginDate        string  `json:"lastPairLoginDate"`
+	LastTrialPlayDate        string  `json:"lastTrialPlayDate"`
+	PlayVsCount              int     `json:"playVsCount"`
+	PlaySyncCount            int     `json:"playSyncCount"`
+	WinCount                 int     `json:"winCount"`
+	HelpCount                int     `json:"helpCount"`
+	ComboCount               int     `json:"comboCount"`
+	TotalPoint               int64   `json:"totalPoint"`
+	TotalDeluxScore          int64   `json:"totalDeluxscore"`
+	TotalBasicDeluxScore     int64   `json:"totalBasicDeluxscore"`
+	TotalAdvancedDeluxScore  int64   `json:"totalAdvancedDeluxscore"`
+	TotalExpertDeluxScore    int64   `json:"totalExpertDeluxscore"`
+	TotalMasterDeluxScore    int64   `json:"totalMasterDeluxscore"`
+	TotalReMasterDeluxScore  int64   `json:"totalReMasterDeluxscore"`
+	TotalSync                int     `json:"totalSync"`
+	TotalBasicSync           int     `json:"totalBasicSync"`
+	TotalAdvancedSync        int     `json:"totalAdvancedSync"`
+	TotalExpertSync          int     `json:"totalExpertSync"`
+	TotalMasterSync          int     `json:"totalMasterSync"`
+	TotalReMasterSync        int     `json:"totalReMasterSync"`
+	TotalAchievement         int64   `json:"totalAchievement"`
+	TotalBasicAchievement    int64   `json:"totalBasicAchievement"`
+	TotalAdvancedAchievement int64   `json:"totalAdvancedAchievement"`
+	TotalExpertAchievement   int64   `json:"totalExpertAchievement"`
+	TotalMasterAchievement   int64   `json:"totalMasterAchievement"`
+	TotalReMasterAchievement int64   `json:"totalReMasterAchievement"`
+	PlayerOldRating          int64   `json:"playerOldRating"`
+	PlayerNewRating          int64   `json:"playerNewRating"`
+	DateTime                 int64   `json:"dateTime"`
+	Point                    int     `json:"point"`
 }
 
 type UserOption struct {
