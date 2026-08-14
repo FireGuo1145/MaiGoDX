@@ -121,6 +121,30 @@ func TestSDGAPlaylogListAndSingleObjectUpsertCreateProfile(t *testing.T) {
 	assertRows(t, &model.UserPlaylog{}, 1)
 }
 
+func TestSDGAUpsertNormalizesSingletonCollections(t *testing.T) {
+	setupMaimaiTestDB(t)
+	queuePlaylog(303, model.UserPlaylog{MusicID: 456, Level: 4, UserPlayDate: "2026-08-14 05:11:00.0"})
+
+	// SDGA 1.60 can send optional collection values as an object instead of
+	// an array. userData is already list-shaped here so this specifically
+	// covers a later collection that used to reject the entire logout save.
+	upsert := `{"userId":303,"upsertUserAll":{"userData":[{"userName":"SingletonPlayer","isNetMember":1}],"userOption":{"noteSpeed":7},"userRatingList":{"ratingList":[]}}}`
+	request := httptest.NewRequest(http.MethodPost, "/g/SDGA/1.60/Maimai2Servlet/UpsertUserAllApi", strings.NewReader(upsert))
+	response := httptest.NewRecorder()
+	MaimaiHandler(response, request)
+
+	var result model.Response
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatalf("decode UpsertUserAll response: %v", err)
+	}
+	if result.ReturnCode != 1 {
+		t.Fatalf("UpsertUserAll returnCode=%d message=%q", result.ReturnCode, result.Message)
+	}
+	assertRows(t, &model.UserDetail{}, 1)
+	assertRows(t, &model.UserOption{}, 1)
+	assertRows(t, &model.UserPlaylog{}, 1)
+}
+
 func TestSDGAPartialLogoutUpsertCreatesProfileForQueuedScores(t *testing.T) {
 	setupMaimaiTestDB(t)
 	queuePlaylog(302, model.UserPlaylog{MusicID: 321, Level: 2, UserPlayDate: "2026-08-14 05:01:00.0"})

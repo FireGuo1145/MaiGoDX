@@ -177,33 +177,59 @@ func handleUploadUserPlaylogList(w http.ResponseWriter, apiName string, body []b
 // latter, while encoding/json rejects it before a new profile can be created.
 func decodeUpsertUserAll(body []byte) (model.UpsertUserAllRequest, error) {
 	var request model.UpsertUserAllRequest
-	if err := json.Unmarshal(body, &request); err == nil {
+	initialErr := json.Unmarshal(body, &request)
+	if initialErr == nil {
 		return request, nil
 	}
 
 	var wire struct {
 		UserID        int64                      `json:"userId"`
 		UpsertUserAll map[string]json.RawMessage `json:"upsertUserAll"`
-		UserPlaylogs  []model.UserPlaylog        `json:"userPlaylogList"`
+		UserPlaylogs  json.RawMessage            `json:"userPlaylogList"`
 	}
 	if err := json.Unmarshal(body, &wire); err != nil {
 		return model.UpsertUserAllRequest{}, err
 	}
-	userData, ok := wire.UpsertUserAll["userData"]
-	if !ok || len(userData) == 0 || userData[0] != '{' {
-		return model.UpsertUserAllRequest{}, fmt.Errorf("userData is not a list or object")
+	if wire.UpsertUserAll == nil {
+		return model.UpsertUserAllRequest{}, fmt.Errorf("missing upsertUserAll: %w", initialErr)
 	}
-	wire.UpsertUserAll["userData"] = append(append([]byte{'['}, userData...), ']')
+	// SDGA 1.60 sends one object instead of an array for several optional
+	// collection fields. AquaDX's mapper accepts these singleton collections;
+	// normalise every known list rather than only userData, otherwise another
+	// singleton field still rejects the whole logout save.
+	for _, key := range []string{
+		"userData", "userOption", "userExtend", "userCharacterList", "userGhost",
+		"userMapList", "userLoginBonusList", "userRatingList", "userItemList",
+		"userMusicDetailList", "userCourseList", "userFriendSeasonRankingList",
+		"userChargeList", "userFavoriteList", "userActivityList", "userGamePlaylogList",
+		"userFavoritemusicList", "userKaleidxScopeList", "userIntimateList", "userPlaylogList",
+	} {
+		value, ok := wire.UpsertUserAll[key]
+		if !ok {
+			continue
+		}
+		trimmed := bytes.TrimSpace(value)
+		if len(trimmed) > 0 && trimmed[0] == '{' {
+			wire.UpsertUserAll[key] = append(append([]byte{'['}, trimmed...), ']')
+		}
+	}
+	rootPlaylogs := bytes.TrimSpace(wire.UserPlaylogs)
+	if len(rootPlaylogs) > 0 && rootPlaylogs[0] == '{' {
+		rootPlaylogs = append(append([]byte{'['}, rootPlaylogs...), ']')
+	}
+	if len(rootPlaylogs) == 0 {
+		rootPlaylogs = []byte("[]")
+	}
 	normalized, err := json.Marshal(map[string]interface{}{
 		"userId":          wire.UserID,
 		"upsertUserAll":   wire.UpsertUserAll,
-		"userPlaylogList": wire.UserPlaylogs,
+		"userPlaylogList": json.RawMessage(rootPlaylogs),
 	})
 	if err != nil {
 		return model.UpsertUserAllRequest{}, err
 	}
 	if err := json.Unmarshal(normalized, &request); err != nil {
-		return model.UpsertUserAllRequest{}, err
+		return model.UpsertUserAllRequest{}, fmt.Errorf("decode normalized payload: %w (initial error: %v)", err, initialErr)
 	}
 	return request, nil
 }
