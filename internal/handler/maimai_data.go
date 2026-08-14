@@ -89,19 +89,21 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 	case "GetUserLoginBonus":
 		var values []model.UserLoginBonus
 		database.DB.Where("user_id = ?", userID).Find(&values)
-		return values, true, nil
+		return unpagedMaimaiPayload(userID, "userLoginBonusList", values), true, nil
 	case "GetUserMap":
 		var values []model.UserMap
 		database.DB.Where("user_id = ?", userID).Find(&values)
-		return values, true, nil
+		return unpagedMaimaiPayload(userID, "userMapList", values), true, nil
 	case "GetUserCourse":
 		var values []model.UserCourse
 		database.DB.Where("user_id = ?", userID).Find(&values)
-		return values, true, nil
+		return unpagedMaimaiPayload(userID, "userCourseList", values), true, nil
 	case "GetUserMusic":
 		var values []model.UserMusicDetail
 		database.DB.Where("user_id = ?", userID).Find(&values)
-		return map[string]interface{}{"userMusicDetailList": values}, true, nil
+		// AquaDX wraps the detail list in one userMusicList entry; returning
+		// userMusicDetailList directly leaves the SDGA loader waiting forever.
+		return unpagedMaimaiPayload(userID, "userMusicList", []map[string]interface{}{{"userMusicDetailList": values}}), true, nil
 	case "GetUserFavorite":
 		itemKind := requestInt(body, "itemKind")
 		var value model.UserFavorite
@@ -171,11 +173,11 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 				result = append(result, gate)
 			}
 		}
-		return result, true, nil
+		return unpagedMaimaiPayload(userID, "userKaleidxScopeList", result), true, nil
 	case "GetUserIntimate":
 		var values []model.UserIntimate
 		database.DB.Where("user_id = ?", userID).Find(&values)
-		return values, true, nil
+		return unpagedMaimaiPayload(userID, "userIntimateList", values), true, nil
 	case "GetUserRating":
 		return userRating(userID), true, nil
 	case "GetGameRanking":
@@ -236,23 +238,52 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 	case "GetUserCard", "CMGetUserCard":
 		var cards []model.UserGameCard
 		database.DB.Where("user_id = ?", userID).Order("card_id asc").Find(&cards)
-		return cards, true, nil
+		return unpagedMaimaiPayload(userID, "userCardList", cards), true, nil
 	case "GetUserCharge":
 		var charges []model.UserCharge
 		database.DB.Where("user_id = ?", userID).Order("charge_id asc").Find(&charges)
-		return charges, true, nil
+		return unpagedMaimaiPayload(userID, "userChargeList", charges), true, nil
 	case "GetUserFriendSeasonRanking":
 		var rankings []model.UserFriendSeasonRanking
 		database.DB.Where("user_id = ?", userID).Order("season_id asc").Find(&rankings)
-		return rankings, true, nil
+		return unpagedMaimaiPayload(userID, "userFriendSeasonRankingList", rankings), true, nil
 	case "GetUserGhost":
-		return []interface{}{}, true, nil
+		return unpagedMaimaiPayload(userID, "userGhostList", []interface{}{}), true, nil
 	case "GetUserCardPrintError", "CMGetUserCardPrintError":
 		return map[string]interface{}{"length": 0, "userPrintDetailList": []interface{}{}}, true, nil
 	case "GetGameNgMusicId":
 		return map[string]interface{}{"length": 0, "musicIdList": []interface{}{}, "ngMusicDataList": []interface{}{}}, true, nil
 	}
 	return nil, false, nil
+}
+
+// unpagedMaimaiPayload mirrors AquaDX's BaseHandler.unpaged response framing.
+// SDGA does not accept a bare JSON array for these endpoints.
+func unpagedMaimaiPayload(userID int64, listKey string, values interface{}) map[string]interface{} {
+	length := 0
+	switch value := values.(type) {
+	case []model.UserLoginBonus:
+		length = len(value)
+	case []model.UserMap:
+		length = len(value)
+	case []model.UserCourse:
+		length = len(value)
+	case []model.UserKaleidx:
+		length = len(value)
+	case []model.UserIntimate:
+		length = len(value)
+	case []model.UserGameCard:
+		length = len(value)
+	case []model.UserCharge:
+		length = len(value)
+	case []model.UserFriendSeasonRanking:
+		length = len(value)
+	case []map[string]interface{}:
+		length = len(value)
+	case []interface{}:
+		length = len(value)
+	}
+	return map[string]interface{}{"userId": userID, "nextIndex": 0, "length": length, listKey: values}
 }
 
 func profileScopedError(err error) error {

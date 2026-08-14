@@ -367,15 +367,17 @@ func TestCMPreviewAndKaleidxMatchAquaDX(t *testing.T) {
 	kaleidxReq := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/GetUserKaleidxScopeApi", strings.NewReader(`{"userId":501}`))
 	kaleidxRes := httptest.NewRecorder()
 	MaimaiHandler(kaleidxRes, kaleidxReq)
-	var gates []map[string]interface{}
-	if err := json.Unmarshal(kaleidxRes.Body.Bytes(), &gates); err != nil {
+	var kaleidxPayload map[string]interface{}
+	if err := json.Unmarshal(kaleidxRes.Body.Bytes(), &kaleidxPayload); err != nil {
 		t.Fatalf("decode Kaleidx scopes: %v", err)
 	}
+	gates := kaleidxPayload["userKaleidxScopeList"].([]interface{})
 	if len(gates) != 6 {
 		t.Fatalf("Kaleidx initial gate count=%d, want 6", len(gates))
 	}
 	for index, gate := range gates {
-		if gate["gateId"] != float64(index+1) || gate["isGateFound"] != true || gate["isKeyFound"] != true {
+		value := gate.(map[string]interface{})
+		if value["gateId"] != float64(index+1) || value["isGateFound"] != true || value["isKeyFound"] != true {
 			t.Fatalf("unexpected Kaleidx gate %d: %v", index+1, gate)
 		}
 	}
@@ -447,12 +449,45 @@ func TestGetUserCardAndCMGetUserCardReturnPersistedCards(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/"+api, strings.NewReader(`{"userId":73}`))
 			res := httptest.NewRecorder()
 			MaimaiHandler(res, req)
-			var cards []map[string]interface{}
-			if err := json.Unmarshal(res.Body.Bytes(), &cards); err != nil {
+			var payload map[string]interface{}
+			if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
 				t.Fatalf("decode card list: %v body=%s", err, res.Body.String())
 			}
-			if len(cards) != 1 || cards[0]["cardId"] != float64(4) {
-				t.Fatalf("unexpected card list: %v", cards)
+			cards := payload["userCardList"].([]interface{})
+			if len(cards) != 1 || cards[0].(map[string]interface{})["cardId"] != float64(4) || payload["length"] != float64(1) {
+				t.Fatalf("unexpected card list: %v", payload)
+			}
+		})
+	}
+}
+
+func TestUnpagedSDGAEndpointsUseAquaDXEnvelope(t *testing.T) {
+	setupMaimaiTestDB(t)
+	if err := database.DB.Create(&model.UserDetail{UserID: 74, UserName: "Envelope"}).Error; err != nil {
+		t.Fatalf("create profile: %v", err)
+	}
+	for _, test := range []struct {
+		api     string
+		listKey string
+	}{
+		{"GetUserLoginBonusApi", "userLoginBonusList"},
+		{"GetUserMapApi", "userMapList"},
+		{"GetUserCourseApi", "userCourseList"},
+		{"GetUserMusicApi", "userMusicList"},
+		{"GetUserGhostApi", "userGhostList"},
+		{"GetUserIntimateApi", "userIntimateList"},
+		{"GetUserKaleidxScopeApi", "userKaleidxScopeList"},
+	} {
+		t.Run(test.api, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/g/SDGA/1.60/Maimai2Servlet/"+test.api, strings.NewReader(`{"userId":74,"nextIndex":0,"maxCount":20}`))
+			res := httptest.NewRecorder()
+			MaimaiHandler(res, req)
+			var payload map[string]interface{}
+			if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("decode response: %v body=%s", err, res.Body.String())
+			}
+			if payload["userId"] != float64(74) || payload["nextIndex"] != float64(0) || payload["length"] == nil || payload[test.listKey] == nil {
+				t.Fatalf("unexpected unpaged payload: %v", payload)
 			}
 		})
 	}
@@ -564,23 +599,25 @@ func TestUpsertAndReadChargeAndFriendSeasonRanking(t *testing.T) {
 	}
 
 	for _, test := range []struct {
-		api  string
-		key  string
-		want float64
+		api     string
+		listKey string
+		key     string
+		want    float64
 	}{
-		{"GetUserChargeApi", "chargeId", 8},
-		{"GetUserFriendSeasonRankingApi", "seasonId", 2},
+		{"GetUserChargeApi", "userChargeList", "chargeId", 8},
+		{"GetUserFriendSeasonRankingApi", "userFriendSeasonRankingList", "seasonId", 2},
 	} {
 		t.Run(test.api, func(t *testing.T) {
 			httpReq := httptest.NewRequest(http.MethodPost, "/g/SDEZ/24000/Maimai2Servlet/"+test.api, strings.NewReader(`{"userId":902}`))
 			res := httptest.NewRecorder()
 			MaimaiHandler(res, httpReq)
-			var values []map[string]interface{}
-			if err := json.Unmarshal(res.Body.Bytes(), &values); err != nil {
+			var payload map[string]interface{}
+			if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
 				t.Fatalf("decode %s: %v body=%s", test.api, err, res.Body.String())
 			}
-			if len(values) != 1 || values[0][test.key] != test.want || values[0]["userId"] != float64(902) {
-				t.Fatalf("%s values=%v", test.api, values)
+			values := payload[test.listKey].([]interface{})
+			if len(values) != 1 || values[0].(map[string]interface{})[test.key] != test.want || payload["userId"] != float64(902) || payload["length"] != float64(1) {
+				t.Fatalf("%s values=%v", test.api, payload)
 			}
 		})
 	}
