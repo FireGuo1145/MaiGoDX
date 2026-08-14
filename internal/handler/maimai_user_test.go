@@ -246,6 +246,28 @@ func TestUserDataPersistsAndRepairsCharacterSlots(t *testing.T) {
 	}
 }
 
+func TestGetUserMapRepairsSelectedMapForMapResult(t *testing.T) {
+	setupMaimaiTestDB(t)
+	if err := database.DB.Create(&model.UserDetail{UserID: 603, UserName: "Map"}).Error; err != nil {
+		t.Fatalf("create profile: %v", err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/g/SDGA/1.60/Maimai2Servlet/GetUserMapApi", strings.NewReader(`{"userId":603,"nextIndex":0}`))
+	response := httptest.NewRecorder()
+	MaimaiHandler(response, request)
+	var payload map[string]interface{}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode map response: %v", err)
+	}
+	maps := payload["userMapList"].([]interface{})
+	if len(maps) != 1 || maps[0].(map[string]interface{})["mapId"] != float64(400001) {
+		t.Fatalf("map response=%v", payload)
+	}
+	var detail model.UserDetail
+	if err := database.DB.Where("user_id = ?", 603).First(&detail).Error; err != nil || detail.SelectMapID != 400001 {
+		t.Fatalf("selected map=%d err=%v", detail.SelectMapID, err)
+	}
+}
+
 func TestUpsertUserPrintPersistsCardAndReceipt(t *testing.T) {
 	setupMaimaiTestDB(t)
 	if err := database.DB.Create(&model.UserDetail{UserID: 77, UserName: "Printer"}).Error; err != nil {

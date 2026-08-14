@@ -94,8 +94,11 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 		database.DB.Where("user_id = ?", userID).Find(&values)
 		return unpagedMaimaiPayload(userID, "userLoginBonusList", values), true, nil
 	case "GetUserMap":
+		if err := ensureSelectedMap(userID); err != nil {
+			return nil, true, err
+		}
 		var values []model.UserMap
-		database.DB.Where("user_id = ?", userID).Find(&values)
+		database.DB.Where("user_id = ?", userID).Order("map_id asc").Find(&values)
 		return unpagedMaimaiPayload(userID, "userMapList", values), true, nil
 	case "GetUserCourse":
 		var values []model.UserCourse
@@ -316,6 +319,31 @@ func defaultSlotCharacters(userID int64) []model.UserCharacter {
 		values = append(values, model.UserCharacter{UserID: userID, CharacterID: characterID, Level: 1})
 	}
 	return values
+}
+
+// ensureSelectedMap repairs legacy profiles which were created before map
+// state was persisted. MapResultProcess indexes the selected map in
+// userMapList, so a zero selectMapId or a missing entry crashes the client at
+// map/course result time instead of merely showing an empty map.
+func ensureSelectedMap(userID int64) error {
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		var detail model.UserDetail
+		if err := tx.Where("user_id = ?", userID).First(&detail).Error; err != nil {
+			return err
+		}
+		if detail.SelectMapID <= 0 {
+			detail.SelectMapID = 400001
+			if err := tx.Model(&model.UserDetail{}).Where("user_id = ?", userID).Update("select_map_id", detail.SelectMapID).Error; err != nil {
+				return err
+			}
+		}
+		var selected model.UserMap
+		err := tx.Where("user_id = ? AND map_id = ?", userID, detail.SelectMapID).First(&selected).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return tx.Create(&model.UserMap{UserID: userID, MapID: detail.SelectMapID}).Error
+		}
+		return err
+	})
 }
 
 // unpagedMaimaiPayload mirrors AquaDX's BaseHandler.unpaged response framing.
