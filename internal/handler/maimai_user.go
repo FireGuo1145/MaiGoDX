@@ -28,16 +28,28 @@ func UpsertUserAll(req model.UpsertUserAllRequest) error {
 	if req.UserID&281474976710657 == 281474976710657 {
 		return nil
 	}
-	if len(req.UpsertUserAll.UserData) == 0 {
-		return errors.New("upsert request has no userData")
-	}
-
 	return database.DB.Transaction(func(tx *gorm.DB) error {
-		user := req.UpsertUserAll.UserData[0]
-		user.ID = 0
-		user.UserID = req.UserID
-		if err := saveDetail(tx, &user); err != nil {
-			return err
+		if len(req.UpsertUserAll.UserData) > 0 {
+			user := req.UpsertUserAll.UserData[0]
+			user.ID = 0
+			user.UserID = req.UserID
+			if err := saveDetail(tx, &user); err != nil {
+				return err
+			}
+		} else {
+			// SDGA 1.60 can send a partial logout UpsertUserAll with no
+			// userData. It still carries scores that must not be discarded. Keep
+			// an existing profile intact, or create the minimum profile needed to
+			// associate the pending playlogs with this Aime external ID.
+			var existing model.UserDetail
+			err := tx.Where("user_id = ?", req.UserID).First(&existing).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				if err := tx.Create(&model.UserDetail{UserID: req.UserID, IsNetMember: 1}).Error; err != nil {
+					return err
+				}
+			} else if err != nil {
+				return err
+			}
 		}
 
 		if len(req.UpsertUserAll.UserOption) > 0 {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
+	"gorm.io/gorm"
 )
 
 // MaimaiHandler dispatches the public maimai2 servlet methods. All player-scoped
@@ -36,19 +37,25 @@ func MaimaiHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch apiName {
 	case "UpsertUserAll":
-		var req model.UpsertUserAllRequest
-		if err := json.Unmarshal(body, &req); err != nil {
+		req, err := decodeUpsertUserAll(body)
+		if err != nil {
+			log.Printf("[MaiGoDX] UpsertUserAll rejected: invalid payload bytes=%d error=%v", len(body), err)
 			writeGameResponse(w, apiName, 0, nil, "invalid UpsertUserAll payload")
 			return
 		}
 		if err := UpsertUserAll(req); err != nil {
+			log.Printf("[MaiGoDX] UpsertUserAll rejected: userId=%d userData=%d playlogs=%d error=%v", req.UserID, len(req.UpsertUserAll.UserData), len(req.UserPlaylogList)+len(req.UpsertUserAll.UserPlaylogList), err)
 			writeGameResponse(w, apiName, 0, nil, err.Error())
 			return
 		}
+		log.Printf("[MaiGoDX] UpsertUserAll saved: userId=%d userData=%d playlogs=%d", req.UserID, len(req.UpsertUserAll.UserData), len(req.UserPlaylogList)+len(req.UpsertUserAll.UserPlaylogList))
 		writeGameResponse(w, apiName, 1, nil, "")
 		return
 	case "UploadUserPlaylog":
 		handleUploadUserPlaylog(w, apiName, body)
+		return
+	case "UploadUserPlaylogList":
+		handleUploadUserPlaylogList(w, apiName, body)
 		return
 	case "UploadUserPhoto":
 		r.Body = io.NopCloser(bytes.NewReader(body))
@@ -126,6 +133,79 @@ func handleUploadUserPlaylog(w http.ResponseWriter, apiName string, body []byte)
 		return
 	}
 	writeGameResponse(w, apiName, 1, nil, "")
+}
+
+// handleUploadUserPlaylogList is used by SDGA 1.60 during logout. AquaDX
+// processes every entry through the ordinary playlog handler so first-play
+// scores are retained until UpsertUserAll creates the player profile.
+func handleUploadUserPlaylogList(w http.ResponseWriter, apiName string, body []byte) {
+	var request struct {
+		UserID   int64               `json:"userId"`
+		Playlogs []model.UserPlaylog `json:"userPlaylogList"`
+	}
+	if err := json.Unmarshal(body, &request); err != nil || request.UserID == 0 {
+		writeGameResponse(w, apiName, 0, nil, "invalid UploadUserPlaylogList payload")
+		return
+	}
+	var detail model.UserDetail
+	if err := database.DB.Where("user_id = ?", request.UserID).First(&detail).Error; err != nil {
+		for _, playlog := range request.Playlogs {
+			queuePlaylog(request.UserID, playlog)
+		}
+		log.Printf("[MaiGoDX] UploadUserPlaylogList queued: userId=%d entries=%d", request.UserID, len(request.Playlogs))
+		writeGameResponse(w, apiName, 1, nil, "")
+		return
+	}
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		for _, playlog := range request.Playlogs {
+			if err := SaveUserPlaylog(tx, detail.UserID, playlog); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		log.Printf("[MaiGoDX] UploadUserPlaylogList rejected: userId=%d entries=%d error=%v", request.UserID, len(request.Playlogs), err)
+		writeGameResponse(w, apiName, 0, nil, err.Error())
+		return
+	}
+	log.Printf("[MaiGoDX] UploadUserPlaylogList saved: userId=%d entries=%d", request.UserID, len(request.Playlogs))
+	writeGameResponse(w, apiName, 1, nil, "")
+}
+
+// decodeUpsertUserAll accepts AquaDX's list-shaped payload and the SDGA 1.60
+// single-object userData variant. The upstream Jackson mapper accepts the
+// latter, while encoding/json rejects it before a new profile can be created.
+func decodeUpsertUserAll(body []byte) (model.UpsertUserAllRequest, error) {
+	var request model.UpsertUserAllRequest
+	if err := json.Unmarshal(body, &request); err == nil {
+		return request, nil
+	}
+
+	var wire struct {
+		UserID        int64                      `json:"userId"`
+		UpsertUserAll map[string]json.RawMessage `json:"upsertUserAll"`
+		UserPlaylogs  []model.UserPlaylog        `json:"userPlaylogList"`
+	}
+	if err := json.Unmarshal(body, &wire); err != nil {
+		return model.UpsertUserAllRequest{}, err
+	}
+	userData, ok := wire.UpsertUserAll["userData"]
+	if !ok || len(userData) == 0 || userData[0] != '{' {
+		return model.UpsertUserAllRequest{}, fmt.Errorf("userData is not a list or object")
+	}
+	wire.UpsertUserAll["userData"] = append(append([]byte{'['}, userData...), ']')
+	normalized, err := json.Marshal(map[string]interface{}{
+		"userId":          wire.UserID,
+		"upsertUserAll":   wire.UpsertUserAll,
+		"userPlaylogList": wire.UserPlaylogs,
+	})
+	if err != nil {
+		return model.UpsertUserAllRequest{}, err
+	}
+	if err := json.Unmarshal(normalized, &request); err != nil {
+		return model.UpsertUserAllRequest{}, err
+	}
+	return request, nil
 }
 
 func requestUserID(body []byte) int64 {

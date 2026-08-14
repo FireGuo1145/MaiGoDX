@@ -92,6 +92,52 @@ func TestBackloggedPlaylogIsPersistedWithFirstUpsert(t *testing.T) {
 	assertRows(t, &model.UserPlaylog{}, 1)
 }
 
+func TestSDGAPlaylogListAndSingleObjectUpsertCreateProfile(t *testing.T) {
+	setupMaimaiTestDB(t)
+	playlog := `{"userId":301,"userPlaylogList":[{"musicId":123,"level":3,"userPlayDate":"2026-08-14 05:00:00.0"}]}`
+	playlogRequest := httptest.NewRequest(http.MethodPost, "/g/SDGA/1.60/Maimai2Servlet/UploadUserPlaylogListApi", strings.NewReader(playlog))
+	playlogResponse := httptest.NewRecorder()
+	MaimaiHandler(playlogResponse, playlogRequest)
+
+	upsert := `{"userId":301,"upsertUserAll":{"userData":{"userName":"NewPlayer","isNetMember":1}}}`
+	upsertRequest := httptest.NewRequest(http.MethodPost, "/g/SDGA/1.60/Maimai2Servlet/UpsertUserAllApi", strings.NewReader(upsert))
+	upsertResponse := httptest.NewRecorder()
+	MaimaiHandler(upsertResponse, upsertRequest)
+
+	var response model.Response
+	if err := json.Unmarshal(upsertResponse.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode UpsertUserAll response: %v", err)
+	}
+	if response.ReturnCode != 1 {
+		t.Fatalf("UpsertUserAll returnCode=%d message=%q", response.ReturnCode, response.Message)
+	}
+	var profile model.UserDetail
+	if err := database.DB.Where("user_id = ?", 301).First(&profile).Error; err != nil {
+		t.Fatalf("load saved profile: %v", err)
+	}
+	if profile.UserName != "NewPlayer" {
+		t.Fatalf("userName=%q", profile.UserName)
+	}
+	assertRows(t, &model.UserPlaylog{}, 1)
+}
+
+func TestSDGAPartialLogoutUpsertCreatesProfileForQueuedScores(t *testing.T) {
+	setupMaimaiTestDB(t)
+	queuePlaylog(302, model.UserPlaylog{MusicID: 321, Level: 2, UserPlayDate: "2026-08-14 05:01:00.0"})
+	request := model.UpsertUserAllRequest{UserID: 302}
+	if err := UpsertUserAll(request); err != nil {
+		t.Fatalf("partial UpsertUserAll: %v", err)
+	}
+	var profile model.UserDetail
+	if err := database.DB.Where("user_id = ?", 302).First(&profile).Error; err != nil {
+		t.Fatalf("load partial-upsert profile: %v", err)
+	}
+	if profile.IsNetMember != 1 {
+		t.Fatalf("isNetMember=%d, want 1", profile.IsNetMember)
+	}
+	assertRows(t, &model.UserPlaylog{}, 1)
+}
+
 func assertRows(t *testing.T, value interface{}, want int64) {
 	t.Helper()
 	var got int64
