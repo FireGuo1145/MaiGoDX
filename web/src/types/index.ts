@@ -88,6 +88,7 @@ export interface Region {
 }
 
 export interface ProfileUpdate {
+  cardId: number
   partnerId: number
   travelPartners: TravelPartner[]
   functionTickets: FunctionTicket[]
@@ -116,6 +117,7 @@ export interface Stats {
   totalUsers: number
   totalPlays: number
   user?: UserDetail
+  selectedCardId?: number
   partner?: Partner
   travelPartners: TravelPartner[]
   functionTickets: FunctionTicket[]

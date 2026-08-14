@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
@@ -46,6 +47,7 @@ type portalRegion struct {
 }
 
 type portalProfileUpdateRequest struct {
+	CardID          uint                   `json:"cardId"`
 	PartnerID       int                    `json:"partnerId"`
 	TravelPartners  []portalTravelPartner  `json:"travelPartners"`
 	FunctionTickets []portalFunctionTicket `json:"functionTickets"`
@@ -82,17 +84,15 @@ func HandleGetStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var card model.UserCard
-	cardLookup := database.DB.Where("user_id = ? AND game_user_id > 0", account.ID).Order("id asc").Limit(1).Find(&card)
-	if cardLookup.Error != nil || cardLookup.RowsAffected == 0 {
-		response["message"] = "当前账户尚未关联 maimai 游戏档案"
+	cardID, err := portalCardIDFromRequest(r)
+	if err != nil {
+		response["message"] = "档案卡片参数无效"
 		_ = json.NewEncoder(w).Encode(response)
 		return
 	}
-	var detail model.UserDetail
-	detailLookup := database.DB.Where("user_id = ?", card.GameUserID).Limit(1).Find(&detail)
-	if detailLookup.Error != nil || detailLookup.RowsAffected == 0 {
-		response["message"] = "已关联的卡片尚未创建 maimai 游戏档案"
+	card, detail, err := portalProfileForAccount(account.ID, cardID)
+	if err != nil {
+		response["message"] = err.Error()
 		_ = json.NewEncoder(w).Encode(response)
 		return
 	}
@@ -101,6 +101,7 @@ func HandleGetStats(w http.ResponseWriter, r *http.Request) {
 	database.DB.Where("user_id = ?", detail.UserID).Order("id desc").Limit(100).Find(&plays)
 
 	response["user"] = detail
+	response["selectedCardId"] = card.ID
 	response["recentPlays"] = plays
 	response["trend"] = makeTrend(plays)
 	response["rankCounts"] = rankCounts(plays)
@@ -131,7 +132,7 @@ func HandleUpdatePortalProfile(w http.ResponseWriter, r *http.Request) {
 		writePortalUpdateError(w, http.StatusBadRequest, "请求参数错误")
 		return
 	}
-	detail, err := portalDetailForAccount(account.ID)
+	detail, err := portalDetailForAccount(account.ID, request.CardID)
 	if err != nil {
 		writePortalUpdateError(w, http.StatusNotFound, err.Error())
 		return
@@ -148,18 +149,36 @@ func writePortalUpdateError(w http.ResponseWriter, status int, message string) {
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": message})
 }
 
-func portalDetailForAccount(accountID uint) (model.UserDetail, error) {
+func portalCardIDFromRequest(r *http.Request) (uint, error) {
+	value := r.URL.Query().Get("cardId")
+	if value == "" {
+		return 0, nil
+	}
+	parsed, err := strconv.ParseUint(value, 10, 64)
+	return uint(parsed), err
+}
+
+func portalProfileForAccount(accountID, cardID uint) (model.UserCard, model.UserDetail, error) {
 	var card model.UserCard
-	lookup := database.DB.Where("user_id = ? AND game_user_id > 0", accountID).Order("id asc").Limit(1).Find(&card)
+	query := database.DB.Where("user_id = ? AND game_user_id > 0", accountID).Order("id asc").Limit(1)
+	if cardID != 0 {
+		query = database.DB.Where("id = ? AND user_id = ? AND game_user_id > 0", cardID, accountID).Limit(1)
+	}
+	lookup := query.Find(&card)
 	if lookup.Error != nil || lookup.RowsAffected == 0 {
-		return model.UserDetail{}, errors.New("当前账户尚未关联 maimai 游戏档案")
+		return model.UserCard{}, model.UserDetail{}, errors.New("当前账户尚未关联所选 maimai 游戏档案")
 	}
 	var detail model.UserDetail
 	lookup = database.DB.Where("user_id = ?", card.GameUserID).Limit(1).Find(&detail)
 	if lookup.Error != nil || lookup.RowsAffected == 0 {
-		return model.UserDetail{}, errors.New("已关联的卡片尚未创建 maimai 游戏档案")
+		return model.UserCard{}, model.UserDetail{}, errors.New("所选卡片尚未创建 maimai 游戏档案")
 	}
-	return detail, nil
+	return card, detail, nil
+}
+
+func portalDetailForAccount(accountID, cardID uint) (model.UserDetail, error) {
+	_, detail, err := portalProfileForAccount(accountID, cardID)
+	return detail, err
 }
 
 func savePortalProfile(detail model.UserDetail, request portalProfileUpdateRequest) error {

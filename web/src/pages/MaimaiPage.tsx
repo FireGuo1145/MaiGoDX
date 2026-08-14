@@ -5,14 +5,17 @@ import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import api from '@/lib/api'
-import { apiErrorMessage, RANK_SUMMARY, type FunctionTicket, type Region, type Stats, type TravelPartner } from '@/types'
+import { apiErrorMessage, RANK_SUMMARY, type FunctionTicket, type Region, type Stats, type TravelPartner, type UserCard } from '@/types'
 
 interface MaimaiPageProps {
   stats: Stats | null
+  cards: UserCard[]
+  selectedCardID?: number
   onProfileChanged: () => Promise<void>
+  onCardSelected: (cardID: number) => void
 }
 
-export function MaimaiPage({ stats, onProfileChanged }: MaimaiPageProps) {
+export function MaimaiPage({ stats, cards, selectedCardID: selectedCardIDProp, onProfileChanged, onCardSelected }: MaimaiPageProps) {
   const plays = stats?.recentPlays || []
   const travelPartners = stats?.travelPartners || []
   const functionTickets = stats?.functionTickets || []
@@ -24,6 +27,8 @@ export function MaimaiPage({ stats, onProfileChanged }: MaimaiPageProps) {
   const [regionText, setRegionText] = useState('')
   const [profileError, setProfileError] = useState('')
   const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const profileCards = cards.filter((card) => card.gameUserId > 0)
+  const selectedCardID = selectedCardIDProp || stats?.selectedCardId || profileCards[0]?.ID || 0
 
   const startProfileEdit = () => {
     setPartnerID(String(stats?.partner?.partnerId || 0))
@@ -39,6 +44,7 @@ export function MaimaiPage({ stats, onProfileChanged }: MaimaiPageProps) {
       setIsSavingProfile(true)
       setProfileError('')
       await api.updateProfile({
+        cardId: selectedCardID,
         partnerId: parseInteger(partnerID, '搭档 ID'),
         travelPartners: parseTravelPartners(travelPartnerText),
         functionTickets: parseFunctionTickets(ticketText),
@@ -55,6 +61,15 @@ export function MaimaiPage({ stats, onProfileChanged }: MaimaiPageProps) {
 
   return (
     <div className="space-y-6">
+      {profileCards.length > 1 ? (
+        <Card className="border-slate-800 bg-slate-900 p-4">
+          <label className="mb-1 block text-sm font-medium text-slate-300">当前 Aime 档案</label>
+          <select value={selectedCardID} onChange={(event) => onCardSelected(Number(event.target.value))} className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-indigo-500 md:max-w-md">
+            {profileCards.map((card) => <option key={card.ID} value={card.ID}>{card.cardName || '未命名卡片'} · 档案 #{card.gameUserId}</option>)}
+          </select>
+          <p className="mt-2 text-xs text-slate-500">每张已绑定 Aime 卡都有独立的 maimai 存档；查看和编辑都会作用于此处选择的档案。</p>
+        </Card>
+      ) : null}
       <Tabs defaultSelectedKey="recent" className="w-full">
         <TabsList className="bg-slate-900 border border-slate-800">
           <TabsTrigger id="recent" className="data-[selected]:bg-indigo-600">最近游玩</TabsTrigger>

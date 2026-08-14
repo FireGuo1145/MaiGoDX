@@ -41,6 +41,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [stats, setStats] = useState<Stats | null>(null)
+  const [selectedProfileCardID, setSelectedProfileCardID] = useState<number | undefined>()
   const [cards, setCards] = useState<UserCard[]>([])
   const [users, setUsers] = useState<UserAccount[]>([])
   const [configs, setConfigs] = useState<SystemConfig[]>([])
@@ -64,10 +65,10 @@ export default function App() {
     return () => { active = false }
   }, [])
 
-  const refreshStats = async () => {
+  const refreshStats = async (cardID = selectedProfileCardID) => {
     if (!user) return
     try {
-      const result = await api.getStats()
+      const result = await api.getStats(cardID)
       if (result.success) setStats(result)
     } catch (error) {
       console.error('Failed to load stats:', apiErrorMessage(error))
@@ -144,6 +145,7 @@ export default function App() {
     void api.logout()
     setUser(null)
     setStats(null)
+    setSelectedProfileCardID(undefined)
     setCards([])
     setUsers([])
     setConfigs([])
@@ -173,7 +175,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage stats={stats} />} />
         <Route path="/dashboard" element={<DashboardPage stats={stats} />} />
-        <Route path="/maimai" element={<MaimaiPage stats={stats} onProfileChanged={refreshStats} />} />
+        <Route path="/maimai" element={<MaimaiPage stats={stats} cards={cards} selectedCardID={selectedProfileCardID} onProfileChanged={() => refreshStats(selectedProfileCardID)} onCardSelected={(cardID) => { setSelectedProfileCardID(cardID); void refreshStats(cardID) }} />} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/settings" element={<SettingsPage user={user} cards={cards} onCardsChanged={refreshCards} />} />
         <Route

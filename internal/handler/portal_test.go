@@ -69,3 +69,22 @@ func TestSavePortalProfileReplacesEditableCollections(t *testing.T) {
 		t.Fatalf("unrelated item was removed: %v", err)
 	}
 }
+
+func TestPortalProfileSelectionIsScopedToBoundCard(t *testing.T) {
+	setupMaimaiTestDB(t)
+	accountID := uint(1)
+	cards := []model.UserCard{{UserID: accountID, AccessCode: "11111111111111111111", GameUserID: 701}, {UserID: accountID, AccessCode: "22222222222222222222", GameUserID: 702}}
+	if err := database.DB.Create(&cards).Error; err != nil {
+		t.Fatalf("create cards: %v", err)
+	}
+	if err := database.DB.Create(&[]model.UserDetail{{UserID: 701, UserName: "First"}, {UserID: 702, UserName: "Second"}}).Error; err != nil {
+		t.Fatalf("create profiles: %v", err)
+	}
+	selected, detail, err := portalProfileForAccount(accountID, cards[1].ID)
+	if err != nil || selected.ID != cards[1].ID || detail.UserName != "Second" {
+		t.Fatalf("selected=%+v detail=%+v err=%v", selected, detail, err)
+	}
+	if _, _, err := portalProfileForAccount(accountID, cards[1].ID+100); err == nil {
+		t.Fatal("unowned card selection should fail")
+	}
+}

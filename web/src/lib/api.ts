@@ -19,7 +19,7 @@ import {
 } from '@/types'
 
 export const api = {
-  getStats: () => getJson<StatsResult>(API_PATHS.stats),
+  getStats: (cardId?: number) => getJson<StatsResult>(cardId ? `${API_PATHS.stats}?cardId=${cardId}` : API_PATHS.stats),
   updateProfile: (profile: ProfileUpdate) => postJson<ApiResult>(API_PATHS.updateProfile, profile),
   login: (email: string, password: string) => postJson<LoginResult>(API_PATHS.login, { email, password }),
   currentUser: () => getJson<LoginResult>(API_PATHS.me),
