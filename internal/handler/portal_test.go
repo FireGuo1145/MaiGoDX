@@ -44,6 +44,7 @@ func TestSavePortalProfileReplacesEditableCollections(t *testing.T) {
 	}
 	request := portalProfileUpdateRequest{
 		PartnerID:       8,
+		Maimile:         12345,
 		TravelPartners:  []portalTravelPartner{{PartnerID: 3, IntimateLevel: 4, IntimateCountRewarded: 2}},
 		FunctionTickets: []portalFunctionTicket{{ItemID: 7, Stock: 5}},
 		Regions:         []portalRegion{{RegionID: 2, PlayCount: 9}},
@@ -52,8 +53,8 @@ func TestSavePortalProfileReplacesEditableCollections(t *testing.T) {
 		t.Fatalf("save portal profile: %v", err)
 	}
 	var saved model.UserDetail
-	if err := database.DB.Where("user_id = ?", 11).First(&saved).Error; err != nil || saved.PartnerID != 8 {
-		t.Fatalf("saved partner=%d err=%v", saved.PartnerID, err)
+	if err := database.DB.Where("user_id = ?", 11).First(&saved).Error; err != nil || saved.PartnerID != 8 || saved.TotalPoint != 12345 {
+		t.Fatalf("saved detail=%+v err=%v", saved, err)
 	}
 	if partners := portalTravelPartners(11); len(partners) != 1 || partners[0].PartnerID != 3 {
 		t.Fatalf("saved travel partners=%v", partners)

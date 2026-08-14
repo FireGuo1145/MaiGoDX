@@ -49,6 +49,7 @@ type portalRegion struct {
 type portalProfileUpdateRequest struct {
 	CardID          uint                   `json:"cardId"`
 	PartnerID       int                    `json:"partnerId"`
+	Maimile         int64                  `json:"maimile"`
 	TravelPartners  []portalTravelPartner  `json:"travelPartners"`
 	FunctionTickets []portalFunctionTicket `json:"functionTickets"`
 	Regions         []portalRegion         `json:"regions"`
@@ -217,11 +218,11 @@ func portalDetailForAccount(accountID, cardID uint) (model.UserDetail, error) {
 }
 
 func savePortalProfile(detail model.UserDetail, request portalProfileUpdateRequest) error {
-	if request.PartnerID < 0 || !validPortalProfileCollections(request) {
+	if request.PartnerID < 0 || request.Maimile < 0 || !validPortalProfileCollections(request) {
 		return errors.New("档案数据包含无效的负数或重复 ID")
 	}
 	return database.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&model.UserDetail{}).Where("user_id = ?", detail.UserID).Update("partner_id", request.PartnerID).Error; err != nil {
+		if err := tx.Model(&model.UserDetail{}).Where("user_id = ?", detail.UserID).Updates(map[string]interface{}{"partner_id": request.PartnerID, "total_point": request.Maimile}).Error; err != nil {
 			return err
 		}
 		if err := tx.Unscoped().Where("user_id = ?", detail.UserID).Delete(&model.UserIntimate{}).Error; err != nil {

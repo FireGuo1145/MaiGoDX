@@ -90,6 +90,7 @@ export interface Region {
 export interface ProfileUpdate {
   cardId: number
   partnerId: number
+  maimile: number
   travelPartners: TravelPartner[]
   functionTickets: FunctionTicket[]
   regions: Region[]

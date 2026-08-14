@@ -19,18 +19,20 @@ export function MaimaiPage({ stats, onProfileChanged }: MaimaiPageProps) {
   const regions = stats?.regions || []
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [partnerID, setPartnerID] = useState('0')
+  const [maimile, setMaimile] = useState('0')
   const [travelPartnerText, setTravelPartnerText] = useState('')
   const [ticketText, setTicketText] = useState('')
   const [regionText, setRegionText] = useState('')
   const [profileError, setProfileError] = useState('')
   const [isSavingProfile, setIsSavingProfile] = useState(false)
-  const [ticketItemID, setTicketItemID] = useState('1')
+  const [ticketItemID, setTicketItemID] = useState('11001')
   const [ticketGrantError, setTicketGrantError] = useState('')
   const [isGrantingTicket, setIsGrantingTicket] = useState(false)
   const selectedCardID = stats?.selectedCardId || 0
 
   const startProfileEdit = () => {
     setPartnerID(String(stats?.partner?.partnerId || 0))
+    setMaimile(String(stats?.user?.totalPoint || 0))
     setTravelPartnerText(travelPartners.map((partner) => `${partner.partnerId}, ${partner.intimateLevel}, ${partner.intimateCountRewarded}`).join('\n'))
     setTicketText(functionTickets.map((ticket) => `${ticket.itemId}, ${ticket.stock}`).join('\n'))
     setRegionText(regions.map((region) => `${region.regionId}, ${region.playCount}`).join('\n'))
@@ -45,6 +47,7 @@ export function MaimaiPage({ stats, onProfileChanged }: MaimaiPageProps) {
       await api.updateProfile({
         cardId: selectedCardID,
         partnerId: parseInteger(partnerID, '搭档 ID'),
+        maimile: parseInteger(maimile, 'maimile 数量'),
         travelPartners: parseTravelPartners(travelPartnerText),
         functionTickets: parseFunctionTickets(ticketText),
         regions: parseRegions(regionText),
@@ -130,8 +133,13 @@ export function MaimaiPage({ stats, onProfileChanged }: MaimaiPageProps) {
                 <label className="mb-1 block text-sm font-medium text-slate-300">当前搭档 ID</label>
                 <input value={partnerID} onChange={(event) => setPartnerID(event.target.value)} inputMode="numeric" className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-indigo-500" />
               </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-300">maimile 数量</label>
+                <input value={maimile} onChange={(event) => setMaimile(event.target.value)} inputMode="numeric" className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-indigo-500" />
+                <p className="mt-1 text-xs text-slate-500">对应游戏档案的 maimile（totalPoint），保存后在机台同步。</p>
+              </div>
               <ProfileTextInput label="旅行伙伴" hint="每行：搭档 ID, 亲密度等级, 已领奖励次数" value={travelPartnerText} onChange={setTravelPartnerText} />
-              <ProfileTextInput label="功能票" hint="每行：票种 ID, 库存" value={ticketText} onChange={setTicketText} />
+              <ProfileTextInput label="功能票" hint="每行：票种 ID, 库存；11001 = 1.5 倍区域前进票" value={ticketText} onChange={setTicketText} />
               <ProfileTextInput label="区域游玩记录" hint="每行：区域 ID, 游玩次数" value={regionText} onChange={setRegionText} />
               {profileError && <p className="text-sm text-red-400">{profileError}</p>}
               <div className="flex justify-end gap-3">
@@ -164,8 +172,8 @@ export function MaimaiPage({ stats, onProfileChanged }: MaimaiPageProps) {
           <ProfileTable
             title="功能票"
             empty="尚未持有功能票。"
-            headers={['票种 ID', '库存']}
-            rows={functionTickets.map((ticket) => [ticket.itemId, ticket.stock])}
+            headers={['票种 ID', '名称', '库存']}
+            rows={functionTickets.map((ticket) => [ticket.itemId, functionTicketName(ticket.itemId), ticket.stock])}
           />
           <TicketGrantPanel
             itemID={ticketItemID}
@@ -253,7 +261,7 @@ function TicketGrantPanel({ itemID, onItemIDChange, onGrant, error, isGranting }
       </div>
       <div className="flex flex-wrap items-end gap-3">
         <label className="block text-sm text-slate-300">
-          票种 ID
+          票种 ID（11001：1.5 倍区域前进票）
           <input value={itemID} onChange={(event) => onItemIDChange(event.target.value)} inputMode="numeric" className="mt-1 block w-28 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-emerald-500" />
         </label>
         {[1, 5, 10].map((amount) => <Button key={amount} variant="secondary" onPress={() => void onGrant(amount)} isDisabled={isGranting}>+{amount}</Button>)}
@@ -261,6 +269,10 @@ function TicketGrantPanel({ itemID, onItemIDChange, onGrant, error, isGranting }
       {error && <p className="text-sm text-red-400">{error}</p>}
     </Card>
   )
+}
+
+function functionTicketName(itemID: number) {
+  return itemID === 11001 ? '1.5 倍区域前进票' : '未命名功能票'
 }
 
 interface ProfileTableProps {
