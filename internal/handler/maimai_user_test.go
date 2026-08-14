@@ -206,6 +206,27 @@ func TestGetGameSettingDoesNotRequireUserID(t *testing.T) {
 	}
 }
 
+func TestGetUserDataUsesAquaDXRatingAndCharacterSlotFields(t *testing.T) {
+	setupMaimaiTestDB(t)
+	if err := database.DB.Create(&model.UserDetail{UserID: 601, UserName: "Schema", Rating: 12345, MaxRating: 12400, CurrentPlayCount: 7, MapStock: 3}).Error; err != nil {
+		t.Fatalf("create profile: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/g/SDGA/1.60/Maimai2Servlet/GetUserDataApi", strings.NewReader(`{"userId":601}`))
+	res := httptest.NewRecorder()
+	MaimaiHandler(res, req)
+	var payload map[string]interface{}
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode user data: %v", err)
+	}
+	userData := payload["userData"].(map[string]interface{})
+	if userData["playerRating"] != float64(12345) || userData["highestRating"] != float64(12400) || userData["currentPlayCount"] != float64(7) || userData["charaSlot"] == nil || userData["charaLockSlot"] == nil {
+		t.Fatalf("userData shape=%v", userData)
+	}
+	if userData["rating"] != nil || userData["userId"] != nil {
+		t.Fatalf("legacy fields leaked into userData: %v", userData)
+	}
+}
+
 func TestUpsertUserPrintPersistsCardAndReceipt(t *testing.T) {
 	setupMaimaiTestDB(t)
 	if err := database.DB.Create(&model.UserDetail{UserID: 77, UserName: "Printer"}).Error; err != nil {

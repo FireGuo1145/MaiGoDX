@@ -11,14 +11,14 @@ import (
 // UserDetail persists a maimai player profile. UserID is the game card external ID.
 type UserDetail struct {
 	gorm.Model               `json:"-"`
-	UserID                   int64  `gorm:"uniqueIndex;not null" json:"userId"`
+	UserID                   int64  `gorm:"uniqueIndex;not null" json:"-"`
 	UserName                 string `json:"userName"`
 	IsNetMember              int    `json:"isNetMember"`
-	EquipGlassesID           int    `json:"equipGlassesId"`
-	EquipBackGroundID        int    `json:"equipBackGroundId"`
-	EquipNamePlateID         int    `json:"equipNamePlateId"`
-	EquipFrameID             int    `json:"equipFrameId"`
-	EquipIconID              int    `json:"equipIconId"`
+	EquipGlassesID           int    `json:"-"`
+	EquipBackGroundID        int    `json:"-"`
+	EquipNamePlateID         int    `json:"-"`
+	EquipFrameID             int    `json:"-"`
+	EquipIconID              int    `json:"-"`
 	IconID                   int    `json:"iconId"`
 	PlateID                  int    `json:"plateId"`
 	TitleID                  int    `json:"titleId"`
@@ -28,13 +28,16 @@ type UserDetail struct {
 	TotalAwake               int    `json:"totalAwake"`
 	GradeRating              int    `json:"gradeRating"`
 	MusicRating              int    `json:"musicRating"`
-	Rating                   int    `json:"rating"`
-	MaxRating                int    `json:"maxRating"`
+	Rating                   int    `json:"playerRating"`
+	MaxRating                int    `json:"highestRating"`
 	GradeRank                int    `json:"gradeRank"`
 	ClassRank                int    `json:"classRank"`
 	CourseRank               int    `json:"courseRank"`
 	ContentBit               int64  `json:"contentBit"`
 	PlayCount                int    `json:"playCount"`
+	CurrentPlayCount         int    `json:"currentPlayCount"`
+	RenameCredit             int    `json:"renameCredit"`
+	MapStock                 int    `json:"mapStock"`
 	EventWatchedDate         string `json:"eventWatchedDate"`
 	LastGameID               string `json:"lastGameId"`
 	LastRomVersion           string `json:"lastRomVersion"`
@@ -87,6 +90,10 @@ type UserDetail struct {
 	TotalExpertAchievement   int64  `json:"totalExpertAchievement"`
 	TotalMasterAchievement   int64  `json:"totalMasterAchievement"`
 	TotalReMasterAchievement int64  `json:"totalReMasterAchievement"`
+	PlayerOldRating          int64  `json:"playerOldRating"`
+	PlayerNewRating          int64  `json:"playerNewRating"`
+	DateTime                 int64  `json:"dateTime"`
+	Point                    int    `json:"point"`
 }
 
 type UserOption struct {

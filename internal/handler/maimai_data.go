@@ -57,7 +57,7 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 		if err := loadProfile(); err != nil {
 			return nil, true, err
 		}
-		return map[string]interface{}{"userId": userID, "userData": detail, "banState": 0}, true, nil
+		return map[string]interface{}{"userId": userID, "userData": maimaiUserDataPayload(detail), "banState": 0}, true, nil
 	case "GetUserExtend":
 		var value model.UserExtend
 		if err := database.DB.Where("user_id = ?", userID).First(&value).Error; err != nil {
@@ -255,6 +255,21 @@ func maimaiReadPayload(apiName string, userID int64, body []byte) (interface{}, 
 		return map[string]interface{}{"length": 0, "musicIdList": []interface{}{}, "ngMusicDataList": []interface{}{}}, true, nil
 	}
 	return nil, false, nil
+}
+
+// maimaiUserDataPayload is the on-wire user-data form. The profile primary
+// key is carried by the outer response; AquaDX omits it from userData and
+// always emits the two character-slot collections as arrays.
+func maimaiUserDataPayload(detail model.UserDetail) interface{} {
+	return struct {
+		model.UserDetail
+		CharaSlot     []int `json:"charaSlot"`
+		CharaLockSlot []int `json:"charaLockSlot"`
+	}{
+		UserDetail:    detail,
+		CharaSlot:     []int{},
+		CharaLockSlot: []int{},
+	}
 }
 
 // unpagedMaimaiPayload mirrors AquaDX's BaseHandler.unpaged response framing.
