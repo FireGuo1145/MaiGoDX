@@ -100,6 +100,12 @@ func InitDB() {
 	defaultConfigs := []model.SystemConfig{
 		{Key: "site_name", Value: "MaiGoDX", Desc: "管理门户显示的站点名称与浏览器页面标题后缀"},
 		{Key: "require_email_verification", Value: "true", Desc: "注册后是否必须完成邮箱验证才允许登录 (true/false)"},
+		{Key: "email_verification_delivery", Value: "development", Desc: "邮箱验证令牌发送方式（development 或 smtp）"},
+		{Key: "email_smtp_host", Value: "", Desc: "SMTP 服务器地址"},
+		{Key: "email_smtp_port", Value: "587", Desc: "SMTP 服务器端口（STARTTLS 通常使用 587）"},
+		{Key: "email_smtp_username", Value: "", Desc: "SMTP 登录用户名"},
+		{Key: "email_smtp_password", Value: "", Desc: "SMTP 登录密码或应用专用密码"},
+		{Key: "email_smtp_from", Value: "", Desc: "验证邮件发件人地址"},
 		{Key: "maintenance_mode", Value: "false", Desc: "服务器全局维护模式开关 (true/false)"},
 		{Key: "event_mode", Value: "false", Desc: "限时活动模式开关 (true/false)"},
 		{Key: "notice_banner", Value: "欢迎来到 MaiGoDX 街机服务器！", Desc: "全服公告横幅内容"},

@@ -65,17 +65,36 @@ function ConfigRow({ config, onSaved }: { config: SystemConfig; onSaved: () => P
 }
 
 function SiteSettingsPanel({ configs, onSaved }: { configs: SystemConfig[]; onSaved: () => Promise<void> }) {
-  const savedSiteName = configs.find((config) => config.key === 'site_name')?.value || 'MaiGoDX'
-  const savedVerification = isTruthyConfig(configs.find((config) => config.key === 'require_email_verification')?.value || 'true')
+  const configValue = (key: string, fallback = '') => configs.find((config) => config.key === key)?.value || fallback
+  const savedSiteName = configValue('site_name', 'MaiGoDX')
+  const savedVerification = isTruthyConfig(configValue('require_email_verification', 'true'))
+  const savedDelivery = configValue('email_verification_delivery', 'development')
+  const savedSmtpHost = configValue('email_smtp_host')
+  const savedSmtpPort = configValue('email_smtp_port', '587')
+  const savedSmtpUsername = configValue('email_smtp_username')
+  const savedSmtpPassword = configValue('email_smtp_password')
+  const savedSmtpFrom = configValue('email_smtp_from')
   const [siteName, setSiteName] = useState(savedSiteName)
   const [requireVerification, setRequireVerification] = useState(savedVerification)
+  const [delivery, setDelivery] = useState(savedDelivery)
+  const [smtpHost, setSmtpHost] = useState(savedSmtpHost)
+  const [smtpPort, setSmtpPort] = useState(savedSmtpPort)
+  const [smtpUsername, setSmtpUsername] = useState(savedSmtpUsername)
+  const [smtpPassword, setSmtpPassword] = useState(savedSmtpPassword)
+  const [smtpFrom, setSmtpFrom] = useState(savedSmtpFrom)
   const [status, setStatus] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     setSiteName(savedSiteName)
     setRequireVerification(savedVerification)
-  }, [savedSiteName, savedVerification])
+    setDelivery(savedDelivery)
+    setSmtpHost(savedSmtpHost)
+    setSmtpPort(savedSmtpPort)
+    setSmtpUsername(savedSmtpUsername)
+    setSmtpPassword(savedSmtpPassword)
+    setSmtpFrom(savedSmtpFrom)
+  }, [savedSiteName, savedVerification, savedDelivery, savedSmtpHost, savedSmtpPort, savedSmtpUsername, savedSmtpPassword, savedSmtpFrom])
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -91,6 +110,12 @@ function SiteSettingsPanel({ configs, onSaved }: { configs: SystemConfig[]; onSa
       const results = await Promise.all([
         api.updateConfig('site_name', name),
         api.updateConfig('require_email_verification', String(requireVerification)),
+        api.updateConfig('email_verification_delivery', delivery),
+        api.updateConfig('email_smtp_host', smtpHost.trim()),
+        api.updateConfig('email_smtp_port', smtpPort.trim()),
+        api.updateConfig('email_smtp_username', smtpUsername.trim()),
+        api.updateConfig('email_smtp_password', smtpPassword),
+        api.updateConfig('email_smtp_from', smtpFrom.trim()),
       ])
       if (results.some((result) => !result.success)) throw new Error('站点设置保存失败')
       await onSaved()
@@ -121,6 +146,26 @@ function SiteSettingsPanel({ configs, onSaved }: { configs: SystemConfig[]; onSa
               <span className="block mt-1 text-xs text-slate-400">开启后，新注册账户需完成邮箱验证才能登录；关闭后，新账户可直接登录。</span>
             </span>
           </label>
+          <div className="space-y-4 rounded-lg border border-slate-800 p-4">
+            <div>
+              <p className="text-sm font-bold text-white">验证邮件服务</p>
+              <p className="mt-1 text-xs text-slate-400">SMTP 使用 STARTTLS；推荐端口为 587。开发模式只在注册响应中返回令牌，不发送邮件。</p>
+            </div>
+            <label className="block space-y-2">
+              <span className="text-xs font-medium text-slate-300">发送方式</span>
+              <select value={delivery} onChange={(event) => setDelivery(event.target.value)} className="h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="development">开发模式（不发送邮件）</option>
+                <option value="smtp">SMTP</option>
+              </select>
+            </label>
+            {delivery === 'smtp' && <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="space-y-2"><span className="block text-xs font-medium text-slate-300">SMTP 主机</span><input value={smtpHost} onChange={(event) => setSmtpHost(event.target.value)} placeholder="smtp.example.com" className="h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500" /></label>
+              <label className="space-y-2"><span className="block text-xs font-medium text-slate-300">端口</span><input value={smtpPort} onChange={(event) => setSmtpPort(event.target.value)} inputMode="numeric" placeholder="587" className="h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500" /></label>
+              <label className="space-y-2"><span className="block text-xs font-medium text-slate-300">用户名</span><input value={smtpUsername} onChange={(event) => setSmtpUsername(event.target.value)} className="h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500" /></label>
+              <label className="space-y-2"><span className="block text-xs font-medium text-slate-300">密码或应用专用密码</span><input type="password" value={smtpPassword} onChange={(event) => setSmtpPassword(event.target.value)} className="h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500" /></label>
+              <label className="space-y-2 sm:col-span-2"><span className="block text-xs font-medium text-slate-300">发件人地址</span><input type="email" value={smtpFrom} onChange={(event) => setSmtpFrom(event.target.value)} placeholder="noreply@example.com" className="h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500" /></label>
+            </div>}
+          </div>
           <div className="flex items-center gap-3">
             <Button isDisabled={isSaving} type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold">{isSaving ? '正在保存…' : '保存站点设置'}</Button>
             {status && <p className={`text-xs ${status === '站点设置已保存。' ? 'text-emerald-400' : 'text-rose-400'}`}>{status}</p>}
@@ -131,62 +176,72 @@ function SiteSettingsPanel({ configs, onSaved }: { configs: SystemConfig[]; onSa
   )
 }
 
+const siteConfigKeys = new Set([
+  'site_name',
+  'require_email_verification',
+  'email_verification_delivery',
+  'email_smtp_host',
+  'email_smtp_port',
+  'email_smtp_username',
+  'email_smtp_password',
+  'email_smtp_from',
+])
+
 export function AdminPage({ users, configs, terminals, events, charges, onUsersChanged, onConfigsChanged, onTerminalsChanged, onEventsChanged, onChargesChanged }: AdminPageProps) {
   return (
-    <div className="space-y-8">
-      <section className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold flex items-center gap-2"><Users /> 用户管理</h2>
-          <Button type="button" onClick={onUsersChanged} size="sm" variant="outline" className="border-slate-700">刷新列表</Button>
-        </div>
-        <Card className="bg-slate-900 border-slate-800 overflow-hidden">
-          <Table>
-            <TableHeader className="bg-slate-800/50">
+    <div className="space-y-6">
+      <Tabs defaultSelectedKey="users" className="space-y-6">
+        <TabsList className="w-full justify-start overflow-x-auto bg-slate-900 border border-slate-800 p-1 rounded-xl">
+          <TabsTrigger id="users" className="min-w-fit rounded-lg px-3 text-slate-400 data-selected:text-white"><Users /> 用户管理</TabsTrigger>
+          <TabsTrigger id="terminals" className="min-w-fit rounded-lg px-3 text-slate-400 data-selected:text-white">机台管理</TabsTrigger>
+          <TabsTrigger id="game-data" className="min-w-fit rounded-lg px-3 text-slate-400 data-selected:text-white">游戏数据</TabsTrigger>
+          <TabsTrigger id="site" className="min-w-fit rounded-lg px-3 text-slate-400 data-selected:text-white">站点设置</TabsTrigger>
+          <TabsTrigger id="advanced" className="min-w-fit rounded-lg px-3 text-slate-400 data-selected:text-white"><Sliders /> 高级配置</TabsTrigger>
+        </TabsList>
+
+        <TabsContent id="users" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold flex items-center gap-2"><Users /> 用户管理</h2>
+            <Button type="button" onClick={onUsersChanged} size="sm" variant="outline" className="border-slate-700">刷新列表</Button>
+          </div>
+          <Card className="bg-slate-900 border-slate-800 overflow-hidden">
+            <Table>
+              <TableHeader className="bg-slate-800/50">
                 <TableHead isRowHeader className="text-slate-300">用户</TableHead>
                 <TableHead className="text-slate-300">状态</TableHead>
                 <TableHead className="text-slate-300">角色</TableHead>
-            </TableHeader>
-            <TableBody>
-              {users.length ? users.map((account) => (
-                <TableRow key={account.ID} className="border-slate-800 hover:bg-slate-800/30">
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8"><AvatarFallback>{initialOf(account.username)}</AvatarFallback></Avatar>
-                      <div><p className="font-bold text-white text-sm">{account.username}</p><p className="text-[10px] text-slate-500">{account.email}</p></div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{account.isVerified ? <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">已验证</Badge> : <Badge variant="outline" className="text-slate-500 border-slate-800">待验证</Badge>}</TableCell>
-                  <TableCell>{account.isAdmin ? <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20">管理员</Badge> : <Badge variant="outline" className="text-slate-500 border-slate-800">用户</Badge>}</TableCell>
-                </TableRow>
-              )) : <TableRow><TableCell className="text-center py-10 text-slate-500">未找到用户。</TableCell><TableCell /><TableCell /></TableRow>}
-            </TableBody>
-          </Table>
-        </Card>
-      </section>
+              </TableHeader>
+              <TableBody>
+                {users.length ? users.map((account) => (
+                  <TableRow key={account.ID} className="border-slate-800 hover:bg-slate-800/30">
+                    <TableCell><div className="flex items-center gap-3"><Avatar className="h-8 w-8"><AvatarFallback>{initialOf(account.username)}</AvatarFallback></Avatar><div><p className="font-bold text-white text-sm">{account.username}</p><p className="text-[10px] text-slate-500">{account.email}</p></div></div></TableCell>
+                    <TableCell>{account.isVerified ? <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">已验证</Badge> : <Badge variant="outline" className="text-slate-500 border-slate-800">待验证</Badge>}</TableCell>
+                    <TableCell>{account.isAdmin ? <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20">管理员</Badge> : <Badge variant="outline" className="text-slate-500 border-slate-800">用户</Badge>}</TableCell>
+                  </TableRow>
+                )) : <TableRow><TableCell className="text-center py-10 text-slate-500">未找到用户。</TableCell><TableCell /><TableCell /></TableRow>}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
 
-      <TerminalPanel terminals={terminals} onChanged={onTerminalsChanged} />
-      <GameDataPanel events={events} charges={charges} onEventsChanged={onEventsChanged} onChargesChanged={onChargesChanged} />
-      <section className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold flex items-center gap-2"><Sliders /> 服务器配置管理</h2>
-          <Button type="button" onClick={onConfigsChanged} size="sm" variant="outline" className="border-slate-700">刷新配置</Button>
-        </div>
-        <Tabs defaultSelectedKey="site" className="space-y-4">
-          <TabsList className="bg-slate-900 border border-slate-800 p-1 rounded-xl">
-            <TabsTrigger id="site" className="rounded-lg px-3 text-slate-400 data-selected:text-white">站点设置</TabsTrigger>
-            <TabsTrigger id="advanced" className="rounded-lg px-3 text-slate-400 data-selected:text-white">高级配置</TabsTrigger>
-          </TabsList>
-          <TabsContent id="site"><SiteSettingsPanel configs={configs} onSaved={onConfigsChanged} /></TabsContent>
-          <TabsContent id="advanced">
-            <Card className="bg-slate-900 border-slate-800">
-              <CardHeader><CardTitle className="text-white text-sm">游戏与服务器高级配置</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                {configs.filter((config) => config.key !== 'site_name' && config.key !== 'require_email_verification').map((config) => <ConfigRow key={config.ID} config={config} onSaved={onConfigsChanged} />)}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </section>
+        <TabsContent id="terminals"><TerminalPanel terminals={terminals} onChanged={onTerminalsChanged} /></TabsContent>
+        <TabsContent id="game-data"><GameDataPanel events={events} charges={charges} onEventsChanged={onEventsChanged} onChargesChanged={onChargesChanged} /></TabsContent>
+
+        <TabsContent id="site" className="space-y-6">
+          <div className="flex justify-between items-center"><h2 className="text-xl font-bold">站点设置</h2><Button type="button" onClick={onConfigsChanged} size="sm" variant="outline" className="border-slate-700">刷新配置</Button></div>
+          <SiteSettingsPanel configs={configs} onSaved={onConfigsChanged} />
+        </TabsContent>
+
+        <TabsContent id="advanced" className="space-y-6">
+          <div className="flex justify-between items-center"><h2 className="text-xl font-bold flex items-center gap-2"><Sliders /> 高级配置</h2><Button type="button" onClick={onConfigsChanged} size="sm" variant="outline" className="border-slate-700">刷新配置</Button></div>
+          <Card className="bg-slate-900 border-slate-800">
+            <CardHeader><CardTitle className="text-white text-sm">游戏与服务器高级配置</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              {configs.filter((config) => !siteConfigKeys.has(config.key)).map((config) => <ConfigRow key={config.ID} config={config} onSaved={onConfigsChanged} />)}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

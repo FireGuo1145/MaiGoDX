@@ -4,8 +4,13 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/mail"
+	"net/smtp"
+	"strconv"
 	"strings"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
@@ -60,11 +65,22 @@ func HandleRegister(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": "创建账号失败"})
 		return
 	}
+	if verificationRequired {
+		if err := sendVerificationEmail(req.Email, verifyToken); err != nil {
+			// Do not leave an account that cannot receive a verification token.
+			database.DB.Unscoped().Delete(&account)
+			w.WriteHeader(http.StatusBadGateway)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": "验证邮件发送失败：" + err.Error()})
+			return
+		}
+	}
 
 	response := map[string]interface{}{"success": true, "verificationRequired": verificationRequired}
 	if verificationRequired {
 		response["message"] = "注册成功，请查收验证邮件"
-		response["verifyToken"] = verifyToken // 开发与测试便利
+		if emailVerificationDelivery() == "development" {
+			response["verifyToken"] = verifyToken // 本地开发模式的测试便利
+		}
 	} else {
 		response["message"] = "注册成功，现在可以直接登录"
 	}
@@ -128,6 +144,46 @@ func HandleGetPublicSiteSettings(w http.ResponseWriter, r *http.Request) {
 func emailVerificationRequired() bool {
 	value := strings.ToLower(authConfigValue("require_email_verification", "true"))
 	return value == "true" || value == "1" || value == "yes"
+}
+
+func emailVerificationDelivery() string {
+	return strings.ToLower(authConfigValue("email_verification_delivery", "development"))
+}
+
+func sendVerificationEmail(recipient, token string) error {
+	if emailVerificationDelivery() == "development" {
+		return nil
+	}
+	if emailVerificationDelivery() != "smtp" {
+		return fmt.Errorf("不支持的邮件发送方式 %q", emailVerificationDelivery())
+	}
+
+	host := authConfigValue("email_smtp_host", "")
+	port := authConfigValue("email_smtp_port", "587")
+	from := authConfigValue("email_smtp_from", "")
+	if host == "" || from == "" {
+		return fmt.Errorf("SMTP 主机和发件人地址必须配置")
+	}
+	if _, err := strconv.ParseUint(port, 10, 16); err != nil {
+		return fmt.Errorf("SMTP 端口无效")
+	}
+	parsedFrom, err := mail.ParseAddress(from)
+	if err != nil || parsedFrom.Address != from {
+		return fmt.Errorf("SMTP 发件人地址无效")
+	}
+
+	username := authConfigValue("email_smtp_username", "")
+	password := authConfigValue("email_smtp_password", "")
+	var auth smtp.Auth
+	if username != "" {
+		auth = smtp.PlainAuth("", username, password, host)
+	}
+	siteName := authConfigValue("site_name", "MaiGoDX")
+	message := fmt.Sprintf("To: %s\r\nFrom: %s\r\nSubject: %s 邮箱验证\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n你的验证令牌是：%s\r\n\r\n请回到 %s 并输入此令牌完成邮箱验证。\r\n", recipient, from, siteName, token, siteName)
+	if err := smtp.SendMail(net.JoinHostPort(host, port), auth, parsedFrom.Address, []string{recipient}, []byte(message)); err != nil {
+		return err
+	}
+	return nil
 }
 
 func authConfigValue(key, fallback string) string {
