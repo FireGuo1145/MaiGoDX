@@ -109,24 +109,28 @@ func HandleAdminMetadataImport(w http.ResponseWriter, r *http.Request) {
 		metadataError(w, 400, "不支持的 dataName，仅支持 music、partner、ticket、chara")
 		return
 	}
-	items := make([]model.SiteMetadataItem, 0, len(parsed.SortList))
-	seen := map[int64]bool{}
+	itemsByID := make(map[int64]model.SiteMetadataItem, len(parsed.SortList))
+	itemOrder := make([]int64, 0, len(parsed.SortList))
 	skipped := 0
 	for _, item := range parsed.SortList {
 		idText := strings.TrimSpace(item.ID)
 		label := strings.TrimSpace(item.Name)
 		id, idErr := strconv.ParseInt(idText, 10, 64)
-		// 空白占位项、不完整项和非法项跳过，不阻断整个 XML 导入。
+		// 空白占位项、不完整项和非法项跳过；重复 ID 保留最后一条名称。
 		if idErr != nil || id < 0 || label == "" {
 			skipped++
 			continue
 		}
-		if seen[id] {
+		if _, exists := itemsByID[id]; !exists {
+			itemOrder = append(itemOrder, id)
+		} else {
 			skipped++
-			continue
 		}
-		seen[id] = true
-		items = append(items, model.SiteMetadataItem{ID: id, Name: label})
+		itemsByID[id] = model.SiteMetadataItem{ID: id, Name: label}
+	}
+	items := make([]model.SiteMetadataItem, 0, len(itemOrder))
+	for _, id := range itemOrder {
+		items = append(items, itemsByID[id])
 	}
 	replaceMetadata(w, metadataPayload{DataName: name, Items: items, Skipped: skipped})
 }
@@ -137,19 +141,25 @@ func replaceMetadata(w http.ResponseWriter, payload metadataPayload) {
 		metadataError(w, 400, "不支持的 dataName")
 		return
 	}
-	seen := map[int64]bool{}
-	clean := make([]model.SiteMetadata, 0, len(payload.Items))
+	lastByID := make(map[int64]model.SiteMetadata, len(payload.Items))
+	itemOrder := make([]int64, 0, len(payload.Items))
+	skipped := payload.Skipped
 	for _, item := range payload.Items {
 		label := strings.TrimSpace(item.Name)
 		if item.ID < 0 || label == "" {
 			metadataError(w, 400, "元数据 ID 必须为非负数且名称不能为空")
 			return
 		}
-		if seen[item.ID] {
-			continue
+		if _, exists := lastByID[item.ID]; !exists {
+			itemOrder = append(itemOrder, item.ID)
+		} else {
+			skipped++
 		}
-		seen[item.ID] = true
-		clean = append(clean, model.SiteMetadata{DataName: name, ItemID: item.ID, Name: label})
+		lastByID[item.ID] = model.SiteMetadata{DataName: name, ItemID: item.ID, Name: label}
+	}
+	clean := make([]model.SiteMetadata, 0, len(itemOrder))
+	for _, id := range itemOrder {
+		clean = append(clean, lastByID[id])
 	}
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("data_name = ?", name).Delete(&model.SiteMetadata{}).Error; err != nil {
@@ -164,7 +174,7 @@ func replaceMetadata(w http.ResponseWriter, payload metadataPayload) {
 		metadataError(w, 500, "保存元数据失败")
 		return
 	}
-	metadataJSON(w, 200, map[string]interface{}{"success": true, "message": metadataNames[name] + " 已保存", "count": len(clean), "skipped": payload.Skipped})
+	metadataJSON(w, 200, map[string]interface{}{"success": true, "message": metadataNames[name] + " 已保存", "count": len(clean), "skipped": skipped})
 }
 
 // HandleGetSiteMetadata exposes display-only mappings to the portal.
