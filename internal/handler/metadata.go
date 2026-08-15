@@ -162,7 +162,7 @@ func replaceMetadata(w http.ResponseWriter, payload metadataPayload) {
 		clean = append(clean, lastByID[id])
 	}
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("data_name = ?", name).Delete(&model.SiteMetadata{}).Error; err != nil {
+		if err := tx.Unscoped().Where("data_name = ?", name).Delete(&model.SiteMetadata{}).Error; err != nil {
 			return err
 		}
 		if len(clean) > 0 {

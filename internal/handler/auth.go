@@ -188,7 +188,7 @@ func sendVerificationEmail(recipient, token string) error {
 
 func authConfigValue(key, fallback string) string {
 	var config model.SystemConfig
-	if err := database.DB.Where("key = ?", key).First(&config).Error; err != nil {
+	if err := database.DB.Where("`key` = ?", key).First(&config).Error; err != nil {
 		return fallback
 	}
 	value := strings.TrimSpace(config.Value)
