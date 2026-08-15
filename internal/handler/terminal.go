@@ -37,6 +37,7 @@ func HandleNaomiTest(w http.ResponseWriter, r *http.Request) {
 
 // HandleAllNetPowerOn authenticates a cabinet Keychip and returns its game URL.
 func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[MaiGoDX] ALL.Net PowerOn received: remote=%s method=%s path=%s host=%s forwarded=%s", clientIP(r), r.Method, r.URL.Path, r.Host, r.Header.Get("AllNet-Forwarded-From"))
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("[MaiGoDX] ALL.Net PowerOn rejected: cannot read request body: %v", err)
@@ -45,20 +46,22 @@ func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 	}
 	request, err := decodeAllNet(payload)
 	if err != nil {
-		log.Printf("[MaiGoDX] ALL.Net PowerOn rejected: invalid DFI payload (bytes=%d): %v", len(payload), err)
+		log.Printf("[MaiGoDX] ALL.Net PowerOn rejected: invalid DFI payload remote=%s path=%s bytes=%d error=%v", clientIP(r), r.URL.Path, len(payload), err)
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
 	keychip := normalizeKeychip(request["serial"])
 	gameID := strings.ToUpper(strings.TrimSpace(request["game_id"]))
 	version := strings.TrimSpace(request["ver"])
+	log.Printf("[MaiGoDX] ALL.Net PowerOn parsed: remote=%s serial=%s game=%s version=%s format_ver=%s token_present=%t", clientIP(r), keychip, gameID, version, request["format_ver"], strings.TrimSpace(request["token"]) != "")
 	if keychip == "" || gameID == "" {
+		log.Printf("[MaiGoDX] ALL.Net PowerOn rejected: missing serial or game_id remote=%s request=%v", clientIP(r), request)
 		terminalReject(w, r, "PowerOn", "missing serial or game_id")
 		return
 	}
 	parsedVersion, err := strconv.ParseFloat(version, 64)
 	if err != nil || parsedVersion < 1.0 {
-		log.Printf("[MaiGoDX] ALL.Net PowerOn rejected: keychip=%s game=%s version=%q is below 1.0", keychip, gameID, version)
+		log.Printf("[MaiGoDX] ALL.Net PowerOn rejected: keychip=%s game=%s version=%q is below 1.0 remote=%s", keychip, gameID, version, clientIP(r))
 		w.Header().Set("Content-Type", "text/plain")
 		_, _ = w.Write([]byte(""))
 		return
@@ -124,7 +127,7 @@ func HandleAllNetPowerOn(w http.ResponseWriter, r *http.Request) {
 	}
 	uri := uriBase + "/" + gameID + "/" + version + "/"
 	fields := aquaPowerOnFields(uri, responseHost, request["token"], request["format_ver"])
-	log.Printf("[MaiGoDX] ALL.Net PowerOn accepted: keychip=%s terminal=%d game=%s version=%s route=%s session=%s uri=%s remote=%s", keychip, terminal.ID, gameID, version, routeMode, sessionLog, uri, clientIP(r))
+	log.Printf("[MaiGoDX] ALL.Net PowerOn accepted: keychip=%s terminal=%d game=%s version=%s route=%s session=%s uri=%s response_host=%s request_host=%s forwarded=%s remote=%s", keychip, terminal.ID, gameID, version, routeMode, sessionLog, uri, responseHost, r.Host, r.Header.Get("AllNet-Forwarded-From"), clientIP(r))
 	// AquaDX returns a plain URL-formatted response with a trailing newline.
 	// KanadeDX parses this with Split('&') and Split('='), so compressed DFI
 	// output or missing base fields causes its PowerOn parser to fail.
