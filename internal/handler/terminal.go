@@ -212,30 +212,67 @@ func createTerminalSession(terminal *model.Terminal, gameID string) (string, err
 }
 
 func findTerminalByKeychip(value string) (model.Terminal, error) {
-	keychip := normalizeKeychip(value)
-	var terminal model.Terminal
-	lookup := database.DB.Where("keychip_id = ?", keychip).Limit(1).Find(&terminal)
-	if lookup.Error != nil || lookup.RowsAffected > 0 {
-		return terminal, lookup.Error
+	var terminals []model.Terminal
+	if err := database.DB.Find(&terminals).Error; err != nil {
+		return model.Terminal{}, err
 	}
-
-	// Segatools commonly sends the 11-character Keychip prefix. Try AquaDX's
-	// conventional 1337 suffix before accepting another full serial with it.
-	if len(keychip) == 11 {
-		lookup = database.DB.Where("keychip_id = ?", keychip+"1337").Limit(1).Find(&terminal)
-		if lookup.Error != nil || lookup.RowsAffected > 0 {
-			return terminal, lookup.Error
-		}
-		lookup = database.DB.Where("keychip_id LIKE ?", keychip+"%").Order("id asc").Limit(1).Find(&terminal)
-		if lookup.Error != nil || lookup.RowsAffected > 0 {
-			return terminal, lookup.Error
+	prefix := keychipMatchPrefix(value)
+	for _, terminal := range terminals {
+		if keychipMatchPrefix(terminal.KeychipID) == prefix {
+			return terminal, nil
 		}
 	}
 	return model.Terminal{}, nil
 }
 
+func findStoredTerminalByKeychipPrefix(value string) (model.Terminal, bool, error) {
+	var terminals []model.Terminal
+	if err := database.DB.Unscoped().Find(&terminals).Error; err != nil {
+		return model.Terminal{}, false, err
+	}
+	prefix := keychipMatchPrefix(value)
+	for _, terminal := range terminals {
+		if keychipMatchPrefix(terminal.KeychipID) == prefix {
+			return terminal, true, nil
+		}
+	}
+	return model.Terminal{}, false, nil
+}
+
 func normalizeKeychip(value string) string {
-	return strings.ToUpper(strings.TrimSpace(value))
+	return strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(value), "-", ""))
+}
+
+func formatKeychip(value string) string {
+	keychip := normalizeKeychip(value)
+	if len(keychip) > 4 {
+		return keychip[:4] + "-" + keychip[4:]
+	}
+	return keychip
+}
+
+func keychipMatchPrefix(value string) string {
+	keychip := normalizeKeychip(value)
+	if len(keychip) > 11 {
+		return keychip[:len(keychip)-4]
+	}
+	return keychip
+}
+
+func isKeychipRegistrationFormat(value string) bool {
+	keychip := strings.ToUpper(strings.TrimSpace(value))
+	if len(keychip) != 16 || keychip[4] != '-' || keychip[0] != 'A' {
+		return false
+	}
+	for index, char := range keychip {
+		if index == 4 {
+			continue
+		}
+		if !((char >= '0' && char <= '9') || (char >= 'A' && char <= 'Z')) {
+			return false
+		}
+	}
+	return true
 }
 
 func clientIP(r *http.Request) string {

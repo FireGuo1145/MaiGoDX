@@ -7,6 +7,8 @@ import (
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
+
+	"gorm.io/gorm"
 )
 
 type terminalRequest struct {
@@ -40,11 +42,12 @@ func HandleCreateTerminal(w http.ResponseWriter, r *http.Request) {
 		writeTerminalError(w, http.StatusBadRequest, "机台参数无效")
 		return
 	}
-	keychip := normalizeKeychip(request.KeychipID)
-	if len(keychip) < 11 || len(keychip) > 32 {
-		writeTerminalError(w, http.StatusBadRequest, "Keychip 序列号长度必须为 11 至 32 位")
+	keychipInput := strings.TrimSpace(request.KeychipID)
+	if !isKeychipRegistrationFormat(keychipInput) {
+		writeTerminalError(w, http.StatusBadRequest, "Keychip 格式必须为 Axxx-xxxxxxxxxxx")
 		return
 	}
+	keychip := formatKeychip(keychipInput)
 	gameID := strings.ToUpper(strings.TrimSpace(request.GameID))
 	if gameID == "" {
 		gameID = "SDEZ"
@@ -54,35 +57,37 @@ func HandleCreateTerminal(w http.ResponseWriter, r *http.Request) {
 		owner = account.ID
 	}
 	terminal := model.Terminal{KeychipID: keychip, Name: strings.TrimSpace(request.Name), GameID: gameID, GameVersion: strings.TrimSpace(request.GameVersion), OwnerAccountID: owner, IsEnabled: true}
-	// Older revisions used GORM soft deletion. Restore such an old Keychip row
-	// in place so an administrator can bind the same physical cabinet again.
-	var deleted model.Terminal
-	lookup := database.DB.Unscoped().Where("keychip_id = ?", keychip).Limit(1).Find(&deleted)
-	if lookup.Error != nil {
+	existing, found, lookupErr := findStoredTerminalByKeychipPrefix(keychip)
+	if lookupErr != nil {
 		writeTerminalError(w, http.StatusInternalServerError, "检查 Keychip 失败")
 		return
 	}
-	if lookup.RowsAffected > 0 {
-		if !deleted.DeletedAt.Valid {
-			writeTerminalError(w, http.StatusConflict, "该 Keychip 已被绑定")
+	if found {
+		if !existing.DeletedAt.Valid {
+			writeTerminalError(w, http.StatusConflict, "该 Keychip 前缀已被绑定")
 			return
 		}
-		terminal.ID = deleted.ID
-		if err := database.DB.Unscoped().Model(&deleted).Updates(map[string]interface{}{
-			"deleted_at": nil, "name": terminal.Name, "game_id": terminal.GameID,
-			"game_version": terminal.GameVersion, "owner_account_id": terminal.OwnerAccountID,
-			"is_enabled": true,
-		}).Error; err != nil {
+		terminal.ID = existing.ID
+		if err := database.DB.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Where("terminal_id = ?", existing.ID).Delete(&model.TerminalSession{}).Error; err != nil {
+				return err
+			}
+			return tx.Unscoped().Model(&existing).Updates(map[string]interface{}{
+				"deleted_at": nil, "keychip_id": keychip, "name": terminal.Name, "game_id": terminal.GameID,
+				"game_version": terminal.GameVersion, "owner_account_id": terminal.OwnerAccountID,
+				"is_enabled": true, "last_seen_keychip": "", "last_seen_at": nil, "last_seen_ip": "",
+			}).Error
+		}); err != nil {
 			writeTerminalError(w, http.StatusInternalServerError, "恢复机台绑定失败")
 			return
 		}
-		lookup = database.DB.Where("id = ?", deleted.ID).Find(&terminal)
+		lookup := database.DB.Where("id = ?", existing.ID).Find(&terminal)
 		if lookup.Error != nil || lookup.RowsAffected == 0 {
 			writeTerminalError(w, http.StatusInternalServerError, "读取恢复后的机台失败")
 			return
 		}
 	} else if err := database.DB.Create(&terminal).Error; err != nil {
-		writeTerminalError(w, http.StatusConflict, "该 Keychip 已被绑定")
+		writeTerminalError(w, http.StatusConflict, "该 Keychip 前缀已被绑定")
 		return
 	}
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "terminal": terminal, "message": "机台绑定成功"})

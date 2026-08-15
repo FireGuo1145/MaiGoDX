@@ -126,32 +126,32 @@ func HandleDeleteUserTerminal(w http.ResponseWriter, r *http.Request) {
 }
 
 func createOwnedTerminal(request terminalRequest, ownerID uint) (model.Terminal, error) {
-	keychip := normalizeKeychip(request.KeychipID)
-	if len(keychip) < 11 || len(keychip) > 32 {
-		return model.Terminal{}, terminalOwnershipError{status: http.StatusBadRequest, message: "Keychip 序列号长度必须为 11 至 32 位"}
+	keychipInput := strings.TrimSpace(request.KeychipID)
+	if !isKeychipRegistrationFormat(keychipInput) {
+		return model.Terminal{}, terminalOwnershipError{status: http.StatusBadRequest, message: "Keychip 格式必须为 Axxx-xxxxxxxxxxx"}
 	}
+	keychip := formatKeychip(keychipInput)
 	gameID := strings.ToUpper(strings.TrimSpace(request.GameID))
 	if gameID == "" {
 		gameID = "SDEZ"
 	}
-	terminal := model.Terminal{
-		KeychipID: keychip, Name: strings.TrimSpace(request.Name), GameID: gameID,
-		GameVersion: strings.TrimSpace(request.GameVersion), OwnerAccountID: ownerID, IsEnabled: true,
+	terminal := model.Terminal{KeychipID: keychip, Name: strings.TrimSpace(request.Name), GameID: gameID, GameVersion: strings.TrimSpace(request.GameVersion), OwnerAccountID: ownerID, IsEnabled: true}
+	existing, found, lookupErr := findStoredTerminalByKeychipPrefix(keychip)
+	if lookupErr != nil {
+		return model.Terminal{}, terminalOwnershipError{status: http.StatusInternalServerError, message: "检查 Keychip 失败"}
 	}
-	var existing model.Terminal
-	result := database.DB.Unscoped().Where("keychip_id = ?", keychip).Find(&existing)
-	if result.Error == nil && result.RowsAffected > 0 {
+	if found {
 		if !existing.DeletedAt.Valid {
-			return model.Terminal{}, terminalOwnershipError{status: http.StatusConflict, message: "该 Keychip 已被其他账户绑定"}
+			return model.Terminal{}, terminalOwnershipError{status: http.StatusConflict, message: "该 Keychip 前缀已被绑定"}
 		}
 		if err := database.DB.Transaction(func(tx *gorm.DB) error {
 			if err := tx.Where("terminal_id = ?", existing.ID).Delete(&model.TerminalSession{}).Error; err != nil {
 				return err
 			}
 			return tx.Unscoped().Model(&existing).Updates(map[string]interface{}{
-				"deleted_at": nil, "name": terminal.Name, "game_id": terminal.GameID,
+				"deleted_at": nil, "keychip_id": keychip, "name": terminal.Name, "game_id": terminal.GameID,
 				"game_version": terminal.GameVersion, "owner_account_id": ownerID, "is_enabled": true,
-				"last_seen_at": nil, "last_seen_ip": "",
+				"last_seen_keychip": "", "last_seen_at": nil, "last_seen_ip": "",
 			}).Error
 		}); err != nil {
 			return model.Terminal{}, terminalOwnershipError{status: http.StatusInternalServerError, message: "恢复机台绑定失败"}
@@ -161,9 +161,6 @@ func createOwnedTerminal(request terminalRequest, ownerID uint) (model.Terminal,
 			return model.Terminal{}, terminalOwnershipError{status: http.StatusInternalServerError, message: "读取机台绑定失败"}
 		}
 		return terminal, nil
-	}
-	if result.Error != nil {
-		return model.Terminal{}, terminalOwnershipError{status: http.StatusInternalServerError, message: "检查 Keychip 失败"}
 	}
 	if err := database.DB.Create(&terminal).Error; err != nil {
 		return model.Terminal{}, terminalOwnershipError{status: http.StatusInternalServerError, message: "创建机台绑定失败"}
