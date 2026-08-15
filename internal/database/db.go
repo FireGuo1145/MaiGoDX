@@ -56,6 +56,7 @@ func InitDB() {
 		&model.UserAccount{},
 		&model.UserCard{},
 		&model.SystemConfig{},
+		&model.SiteMetadata{},
 		&model.GameEvent{},
 		&model.GameCharge{},
 		&model.GameSellingCard{},

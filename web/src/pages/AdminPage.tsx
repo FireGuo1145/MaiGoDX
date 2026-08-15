@@ -10,6 +10,7 @@ import api from '@/lib/api'
 import type { GameCharge, GameEvent, SystemConfig, Terminal, UserAccount } from '@/types'
 import { TerminalPanel } from '@/components/admin/TerminalPanel'
 import { GameDataPanel } from '@/components/admin/GameDataPanel'
+import { MetadataPanel } from '@/components/admin/MetadataPanel'
 import { apiErrorMessage, initialOf, isTruthyConfig } from '@/types'
 
 interface AdminPageProps {
@@ -196,6 +197,7 @@ export function AdminPage({ users, configs, terminals, events, charges, onUsersC
           <TabsTrigger id="terminals" className="min-w-fit rounded-lg px-3 text-slate-400 data-selected:text-white">机台管理</TabsTrigger>
           <TabsTrigger id="game-data" className="min-w-fit rounded-lg px-3 text-slate-400 data-selected:text-white">游戏数据</TabsTrigger>
           <TabsTrigger id="site" className="min-w-fit rounded-lg px-3 text-slate-400 data-selected:text-white">站点设置</TabsTrigger>
+          <TabsTrigger id="metadata" className="min-w-fit rounded-lg px-3 text-slate-400 data-selected:text-white">站点管理</TabsTrigger>
           <TabsTrigger id="advanced" className="min-w-fit rounded-lg px-3 text-slate-400 data-selected:text-white"><Sliders /> 高级配置</TabsTrigger>
         </TabsList>
 
@@ -230,6 +232,10 @@ export function AdminPage({ users, configs, terminals, events, charges, onUsersC
         <TabsContent id="site" className="space-y-6">
           <div className="flex justify-between items-center"><h2 className="text-xl font-bold">站点设置</h2><Button type="button" onClick={onConfigsChanged} size="sm" variant="outline" className="border-slate-700">刷新配置</Button></div>
           <SiteSettingsPanel configs={configs} onSaved={onConfigsChanged} />
+        </TabsContent>
+        <TabsContent id="metadata" className="space-y-6">
+          <div className="flex items-center justify-between"><h2 className="text-xl font-bold">站点管理</h2><p className="text-sm text-slate-400">游戏 ID 与名称的显示元数据</p></div>
+          <MetadataPanel />
         </TabsContent>
 
         <TabsContent id="advanced" className="space-y-6">

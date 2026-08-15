@@ -5,18 +5,20 @@ import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import api from '@/lib/api'
-import { apiErrorMessage, RANK_SUMMARY, type FunctionTicket, type Region, type Stats, type TravelPartner } from '@/types'
+import { apiErrorMessage, RANK_SUMMARY, type FunctionTicket, type MetadataItem, type Region, type Stats, type TravelPartner } from '@/types'
 
 interface MaimaiPageProps {
   stats: Stats | null
+  metadata: Record<string, MetadataItem[]>
   onProfileChanged: () => Promise<void>
 }
 
-export function MaimaiPage({ stats, onProfileChanged }: MaimaiPageProps) {
+export function MaimaiPage({ stats, metadata, onProfileChanged }: MaimaiPageProps) {
   const plays = stats?.recentPlays || []
   const travelPartners = stats?.travelPartners || []
   const functionTickets = stats?.functionTickets || []
   const regions = stats?.regions || []
+  const metadataName = (kind: string, id: number) => metadata[kind]?.find((item) => item.id === id)?.name || `ID ${id}`
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [partnerID, setPartnerID] = useState('0')
   const [maimile, setMaimile] = useState('0')
@@ -96,7 +98,7 @@ export function MaimaiPage({ stats, onProfileChanged }: MaimaiPageProps) {
               <TableBody>
                 {plays.length ? plays.map((play) => (
                   <TableRow key={play.ID} className="border-slate-800 hover:bg-slate-800/30">
-                    <TableCell className="font-bold text-white">乐曲 ID：{play.musicId}</TableCell>
+                    <TableCell className="font-bold text-white">{metadataName('music', play.musicId)} <span className="text-xs font-normal text-slate-500">#{play.musicId}</span></TableCell>
                     <TableCell><Badge variant="outline" className="border-indigo-500/50 text-indigo-400">LV.{play.level}</Badge></TableCell>
                     <TableCell className="text-right font-mono text-emerald-400">{(play.achievement / 10000).toFixed(4)}%</TableCell>
                     <TableCell className="text-right font-mono">{play.score.toLocaleString()}</TableCell>
@@ -152,7 +154,7 @@ export function MaimaiPage({ stats, onProfileChanged }: MaimaiPageProps) {
             <Card className="border-slate-800 bg-slate-900 p-5">
               <p className="text-sm font-medium text-slate-400">当前搭档</p>
               <p className="mt-2 text-3xl font-black text-indigo-400">
-                {stats?.partner?.partnerId ? `ID ${stats.partner.partnerId}` : '未装备'}
+                {stats?.partner?.partnerId ? `${metadataName('partner', stats.partner.partnerId)}（ID ${stats.partner.partnerId}）` : '未装备'}
               </p>
               <p className="mt-2 text-xs text-slate-500">来自机台同步的 partnerId。</p>
             </Card>
@@ -166,14 +168,14 @@ export function MaimaiPage({ stats, onProfileChanged }: MaimaiPageProps) {
           <ProfileTable
             title="旅行伙伴"
             empty="尚无旅行伙伴数据。完成机台同步后会显示在这里。"
-            headers={['搭档 ID', '亲密度等级', '已领奖励次数']}
-            rows={travelPartners.map((partner) => [partner.partnerId, partner.intimateLevel, partner.intimateCountRewarded])}
+            headers={['旅行伙伴', '亲密度等级', '已领奖励次数']}
+            rows={travelPartners.map((partner) => [`${metadataName('chara', partner.partnerId)}（ID ${partner.partnerId}）`, partner.intimateLevel, partner.intimateCountRewarded])}
           />
           <ProfileTable
             title="功能票"
             empty="尚未持有功能票。"
             headers={['票种 ID', '名称', '库存']}
-            rows={functionTickets.map((ticket) => [ticket.itemId, functionTicketName(ticket.itemId), ticket.stock])}
+            rows={functionTickets.map((ticket) => [ticket.itemId, metadataName('ticket', ticket.itemId), ticket.stock])}
           />
           <TicketGrantPanel
             itemID={ticketItemID}
@@ -271,9 +273,6 @@ function TicketGrantPanel({ itemID, onItemIDChange, onGrant, error, isGranting }
   )
 }
 
-function functionTicketName(itemID: number) {
-  return itemID === 11001 ? '1.5 倍区域前进票' : '未命名功能票'
-}
 
 interface ProfileTableProps {
   title: string

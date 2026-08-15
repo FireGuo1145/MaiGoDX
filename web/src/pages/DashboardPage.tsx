@@ -2,10 +2,11 @@ import { Award, TrendingUp } from 'lucide-react'
 import { Line, LineChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { type SongComp, type Stats } from '@/types'
+import { type MetadataItem, type SongComp, type Stats } from '@/types'
 
 interface DashboardPageProps {
   stats: Stats | null
+  metadata: Record<string, MetadataItem[]>
 }
 
 interface RatingListProps {
@@ -15,8 +16,9 @@ interface RatingListProps {
   emptyMessage: string
 }
 
-function RatingList({ title, songs, tone, emptyMessage }: RatingListProps) {
+function RatingList({ title, songs, tone, emptyMessage, metadata }: RatingListProps & { metadata: Record<string, MetadataItem[]> }) {
   const color = tone === 'indigo' ? 'text-indigo-400' : 'text-emerald-400'
+  const songName = (id: number) => metadata.music?.find((item) => item.id === id)?.name || `ID ${id}`
   const badge = tone === 'indigo' ? 'bg-indigo-600' : 'bg-emerald-600'
 
   return (
@@ -26,7 +28,7 @@ function RatingList({ title, songs, tone, emptyMessage }: RatingListProps) {
         {songs?.length ? songs.map((song, index) => (
           <div key={`${song.musicId}-${song.level}-${index}`} className="flex items-center justify-between p-3 bg-slate-800/60 rounded-lg gap-4">
             <div className="min-w-0">
-              <p className="font-bold text-white text-sm truncate">乐曲 ID：{song.musicId}</p>
+              <p className="font-bold text-white text-sm truncate">{songName(song.musicId)} <span className="text-xs font-normal text-slate-500">#{song.musicId}</span></p>
               <p className="text-xs text-slate-400">难度：{song.level} | 达成率：{(song.achievement / 10000).toFixed(4)}% | DX 分数：{song.score.toLocaleString()}</p>
             </div>
             <Badge className={`${badge} text-white font-mono shrink-0`}>评级 {song.scoreRank || '—'}</Badge>
@@ -37,7 +39,7 @@ function RatingList({ title, songs, tone, emptyMessage }: RatingListProps) {
   )
 }
 
-export function DashboardPage({ stats }: DashboardPageProps) {
+export function DashboardPage({ stats, metadata }: DashboardPageProps) {
   const rating = stats?.user?.playerRating
   const maxRating = stats?.user?.highestRating
   const playCount = stats?.totalPlays
@@ -61,8 +63,8 @@ export function DashboardPage({ stats }: DashboardPageProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RatingList title="最佳成绩（旧曲）" songs={stats?.ratingComposition?.bests} tone="indigo" emptyMessage="暂无评级构成数据。" />
-        <RatingList title="最佳成绩（新曲）" songs={stats?.ratingComposition?.newBests} tone="emerald" emptyMessage="暂无新曲最佳成绩。" />
+        <RatingList title="最佳成绩（旧曲）" songs={stats?.ratingComposition?.bests} tone="indigo" emptyMessage="暂无评级构成数据。" metadata={metadata} />
+        <RatingList title="最佳成绩（新曲）" songs={stats?.ratingComposition?.newBests} tone="emerald" emptyMessage="暂无新曲最佳成绩。" metadata={metadata} />
       </div>
 
       <Card className="bg-slate-900 border-slate-800">

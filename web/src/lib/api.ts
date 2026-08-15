@@ -2,11 +2,14 @@ import {
   API_PATHS,
   getJson,
   postJson,
+  requestJson,
   type ApiResult,
   type CardsResult,
   type ConfigsResult,
   type FunctionTicketAdjust,
   type LoginResult,
+  type MetadataItem,
+  type MetadataResult,
   type ProfileUpdate,
   type RegisterResult,
   type SiteSettingsResult,
@@ -22,6 +25,7 @@ import {
 
 export const api = {
   getSiteSettings: () => getJson<SiteSettingsResult>(API_PATHS.site),
+  getSiteMetadata: () => getJson<MetadataResult>(API_PATHS.siteMetadata),
   getStats: (cardId?: number) => getJson<StatsResult>(cardId ? `${API_PATHS.stats}?cardId=${cardId}` : API_PATHS.stats),
   updateProfile: (profile: ProfileUpdate) => postJson<ApiResult>(API_PATHS.updateProfile, profile),
   adjustFunctionTicket: (ticket: FunctionTicketAdjust) => postJson<ApiResult>(API_PATHS.adjustTicket, ticket),
@@ -53,6 +57,9 @@ export const api = {
   deleteGameCharge: (chargeId: number) => postJson<ApiResult>(API_PATHS.deleteCharge, { chargeId }),
   getConfigs: () => getJson<ConfigsResult>(API_PATHS.configs),
   updateConfig: (key: string, value: string) => postJson<ApiResult>(API_PATHS.updateConfig, { key, value }),
+  getMetadata: () => getJson<MetadataResult>(API_PATHS.metadata),
+  saveMetadata: (dataName: string, items: MetadataItem[]) => postJson<ApiResult>(API_PATHS.metadata, { dataName, items }),
+  importMetadata: async (file: File) => { const form = new FormData(); form.append('file', file); return requestJson<ApiResult>(API_PATHS.metadataImport, { method: 'POST', body: form }) },
 }
 
 export default api

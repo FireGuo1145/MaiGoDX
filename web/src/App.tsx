@@ -9,7 +9,7 @@ import { HomePage } from '@/pages/HomePage'
 import { MaimaiPage } from '@/pages/MaimaiPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { SetupPage } from '@/pages/SetupPage'
-import type { GameCharge, GameEvent, LoginResult, PageId, Stats, SystemConfig, Terminal, UserAccount, UserCard } from '@/types'
+import type { GameCharge, GameEvent, LoginResult, MetadataItem, PageId, Stats, SystemConfig, Terminal, UserAccount, UserCard } from '@/types'
 import { apiErrorMessage } from '@/types'
 
 const pageTitles: Record<PageId, string> = {
@@ -55,6 +55,7 @@ export default function App() {
   const [users, setUsers] = useState<UserAccount[]>([])
   const [configs, setConfigs] = useState<SystemConfig[]>([])
   const [siteName, setSiteName] = useState('MaiGoDX')
+  const [metadata, setMetadata] = useState<Record<string, MetadataItem[]>>({})
   const [terminals, setTerminals] = useState<Terminal[]>([])
   const [events, setEvents] = useState<GameEvent[]>([])
   const [charges, setCharges] = useState<GameCharge[]>([])
@@ -73,6 +74,7 @@ export default function App() {
 
   useEffect(() => {
     void refreshSiteSettings()
+    void api.getSiteMetadata().then((result) => { if (result.success) setMetadata(result.metadata || {}) }).catch((error) => console.error('Failed to load site metadata:', apiErrorMessage(error)))
     let active = true
     void api.currentUser()
       .then((result) => {
@@ -208,8 +210,8 @@ export default function App() {
     >
       <Routes>
         <Route path="/" element={<HomePage stats={stats} />} />
-        <Route path="/dashboard" element={<DashboardPage stats={stats} />} />
-        <Route path="/maimai" element={<MaimaiPage stats={stats} onProfileChanged={() => refreshStats(selectedProfileCardID)} />} />
+        <Route path="/dashboard" element={<DashboardPage stats={stats} metadata={metadata} />} />
+        <Route path="/maimai" element={<MaimaiPage stats={stats} metadata={metadata} onProfileChanged={() => refreshStats(selectedProfileCardID)} />} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/settings" element={<SettingsPage user={user} cards={cards} onCardsChanged={refreshCards} />} />
         <Route

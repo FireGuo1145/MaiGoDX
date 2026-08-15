@@ -165,6 +165,8 @@ export interface UsersResult extends ApiResult {
   users: UserAccount[]
 }
 
+export interface MetadataItem { id: number; name: string }
+export interface MetadataResult extends ApiResult { metadata: Record<string, MetadataItem[]>; types: Record<string, string> }
 export interface ConfigsResult extends ApiResult {
   configs: SystemConfig[]
 }
@@ -187,6 +189,7 @@ export interface AuthNotice {
 
 export const API_PATHS = {
   site: '/api/site',
+  siteMetadata: '/api/site/metadata',
   stats: '/api/stats',
   updateProfile: '/api/maimai/profile/update',
   adjustTicket: '/api/maimai/profile/ticket/adjust',
@@ -215,6 +218,8 @@ export const API_PATHS = {
   deleteCharge: '/api/admin/charge/delete',
   configs: '/api/admin/config/get',
   updateConfig: '/api/admin/config/update',
+  metadata: '/api/admin/metadata',
+  metadataImport: '/api/admin/metadata/import',
 } as const
 
 export const DEFAULT_ADMIN_EMAIL = 'admin@maigodx.local'
