@@ -132,7 +132,7 @@ export function MaimaiPage({ stats, metadata, onProfileChanged }: MaimaiPageProp
           {isEditingProfile ? (
             <Card className="space-y-4 border-indigo-500/40 bg-slate-900 p-5">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-300">当前搭档 ID</label>
+                <label className="mb-1 block text-sm font-medium text-slate-300">当前搭档：{metadataName('partner', Number(partnerID))}（ID {partnerID || '0'}）</label>
                 <input value={partnerID} onChange={(event) => setPartnerID(event.target.value)} inputMode="numeric" className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-indigo-500" />
               </div>
               <div>
@@ -183,6 +183,7 @@ export function MaimaiPage({ stats, metadata, onProfileChanged }: MaimaiPageProp
             onGrant={grantTicket}
             error={ticketGrantError}
             isGranting={isGrantingTicket}
+            metadataName={(id) => metadataName('ticket', id)}
           />
           <ProfileTable
             title="区域游玩记录"
@@ -252,9 +253,10 @@ interface TicketGrantPanelProps {
   onGrant: (amount: number) => Promise<void>
   error: string
   isGranting: boolean
+  metadataName: (id: number) => string
 }
 
-function TicketGrantPanel({ itemID, onItemIDChange, onGrant, error, isGranting }: TicketGrantPanelProps) {
+function TicketGrantPanel({ itemID, onItemIDChange, onGrant, error, isGranting, metadataName }: TicketGrantPanelProps) {
   return (
     <Card className="space-y-3 border-emerald-500/30 bg-slate-900 p-5">
       <div>
@@ -263,7 +265,7 @@ function TicketGrantPanel({ itemID, onItemIDChange, onGrant, error, isGranting }
       </div>
       <div className="flex flex-wrap items-end gap-3">
         <label className="block text-sm text-slate-300">
-          票种 ID（11001：1.5 倍区域前进票）
+          票种：{metadataName(Number(itemID))}（ID {itemID || '0'}）
           <input value={itemID} onChange={(event) => onItemIDChange(event.target.value)} inputMode="numeric" className="mt-1 block w-28 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-emerald-500" />
         </label>
         {[1, 5, 10].map((amount) => <Button key={amount} variant="secondary" onPress={() => void onGrant(amount)} isDisabled={isGranting}>+{amount}</Button>)}
