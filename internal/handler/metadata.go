@@ -24,6 +24,7 @@ type metadataXML struct {
 type metadataPayload struct {
 	DataName string                   `json:"dataName"`
 	Items    []model.SiteMetadataItem `json:"items"`
+	Skipped  int                      `json:"-"`
 }
 
 var metadataNames = map[string]string{"music": "歌曲列表", "partner": "搭档列表", "ticket": "功能票列表", "chara": "旅行伙伴列表"}
@@ -110,24 +111,24 @@ func HandleAdminMetadataImport(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]model.SiteMetadataItem, 0, len(parsed.SortList))
 	seen := map[int64]bool{}
+	skipped := 0
 	for _, item := range parsed.SortList {
-		id, idErr := strconv.ParseInt(strings.TrimSpace(item.ID), 10, 64)
+		idText := strings.TrimSpace(item.ID)
 		label := strings.TrimSpace(item.Name)
+		id, idErr := strconv.ParseInt(idText, 10, 64)
+		// 空白占位项、不完整项和非法项跳过，不阻断整个 XML 导入。
 		if idErr != nil || id < 0 || label == "" {
-			metadataError(w, 400, "XML 中存在无效的 ID 或名称")
-			return
+			skipped++
+			continue
 		}
 		if seen[id] {
+			skipped++
 			continue
 		}
 		seen[id] = true
 		items = append(items, model.SiteMetadataItem{ID: id, Name: label})
 	}
-	if len(items) == 0 {
-		metadataError(w, 400, "XML 未包含有效的 StringID 条目")
-		return
-	}
-	replaceMetadata(w, metadataPayload{DataName: name, Items: items})
+	replaceMetadata(w, metadataPayload{DataName: name, Items: items, Skipped: skipped})
 }
 
 func replaceMetadata(w http.ResponseWriter, payload metadataPayload) {
@@ -163,7 +164,7 @@ func replaceMetadata(w http.ResponseWriter, payload metadataPayload) {
 		metadataError(w, 500, "保存元数据失败")
 		return
 	}
-	metadataJSON(w, 200, map[string]interface{}{"success": true, "message": metadataNames[name] + " 已保存", "count": len(clean)})
+	metadataJSON(w, 200, map[string]interface{}{"success": true, "message": metadataNames[name] + " 已保存", "count": len(clean), "skipped": payload.Skipped})
 }
 
 // HandleGetSiteMetadata exposes display-only mappings to the portal.
