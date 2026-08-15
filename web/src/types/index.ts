@@ -26,6 +26,7 @@ export interface SystemConfig {
 export interface Terminal {
   ID: number
   keychipId: string
+  lastSeenKeychip?: string
   name: string
   gameId: string
   gameVersion: string

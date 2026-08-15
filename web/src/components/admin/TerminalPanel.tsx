@@ -93,7 +93,7 @@ export function TerminalPanel({ terminals, onChanged }: TerminalPanelProps) {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-bold text-white">{terminal.name || '未命名机台'}</p>
-                  <p className="mt-1 font-mono text-xs text-indigo-300">{terminal.keychipId}</p>
+                  <p className="mt-1 font-mono text-xs text-indigo-300">登记 Keychip：{terminal.keychipId}</p>{terminal.lastSeenKeychip && terminal.lastSeenKeychip !== terminal.keychipId ? <p className="mt-1 font-mono text-xs text-amber-300">最近上报：{terminal.lastSeenKeychip}</p> : null}
                 </div>
                 <Badge className={terminal.isEnabled ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' : 'bg-rose-500/15 text-rose-300 border-rose-500/25'}>{terminal.isEnabled ? '已启用' : '已停用'}</Badge>
               </div>
