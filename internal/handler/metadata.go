@@ -84,7 +84,7 @@ func HandleAdminMetadataImport(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	if err := r.ParseMultipartForm(16 << 20); err != nil {
+	if err := r.ParseMultipartForm(64 << 20); err != nil {
 		metadataError(w, 400, "上传文件无效")
 		return
 	}
@@ -94,7 +94,7 @@ func HandleAdminMetadataImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
-	raw, err := io.ReadAll(io.LimitReader(file, 16<<20))
+	raw, err := io.ReadAll(io.LimitReader(file, 64<<20))
 	if err != nil {
 		metadataError(w, 400, "读取 XML 文件失败")
 		return
@@ -156,7 +156,7 @@ func replaceMetadata(w http.ResponseWriter, payload metadataPayload) {
 			return err
 		}
 		if len(clean) > 0 {
-			return tx.Create(&clean).Error
+			return tx.CreateInBatches(clean, 500).Error
 		}
 		return nil
 	})
