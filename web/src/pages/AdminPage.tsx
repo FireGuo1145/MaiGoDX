@@ -24,6 +24,7 @@ interface AdminPageProps {
   onTerminalsChanged: () => Promise<void>
   onEventsChanged: () => Promise<void>
   onChargesChanged: () => Promise<void>
+  onMetadataChanged: () => Promise<void>
 }
 
 function ConfigRow({ config, onSaved }: { config: SystemConfig; onSaved: () => Promise<void> }) {
@@ -188,7 +189,7 @@ const siteConfigKeys = new Set([
   'email_smtp_from',
 ])
 
-export function AdminPage({ users, configs, terminals, events, charges, onUsersChanged, onConfigsChanged, onTerminalsChanged, onEventsChanged, onChargesChanged }: AdminPageProps) {
+export function AdminPage({ users, configs, terminals, events, charges, onUsersChanged, onConfigsChanged, onTerminalsChanged, onEventsChanged, onChargesChanged, onMetadataChanged }: AdminPageProps) {
   return (
     <div className="space-y-6">
       <Tabs defaultSelectedKey="users" className="space-y-6">
@@ -235,7 +236,7 @@ export function AdminPage({ users, configs, terminals, events, charges, onUsersC
         </TabsContent>
         <TabsContent id="metadata" className="space-y-6">
           <div className="flex items-center justify-between"><h2 className="text-xl font-bold">站点管理</h2><p className="text-sm text-slate-400">游戏 ID 与名称的显示元数据</p></div>
-          <MetadataPanel />
+          <MetadataPanel onChanged={onMetadataChanged} />
         </TabsContent>
 
         <TabsContent id="advanced" className="space-y-6">

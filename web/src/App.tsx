@@ -63,6 +63,14 @@ export default function App() {
   const navigate = useNavigate()
   const page = pageFromPath(location.pathname)
 
+  const refreshMetadata = async () => {
+    try {
+      const result = await api.getSiteMetadata()
+      if (result.success) setMetadata(result.metadata || {})
+    } catch (error) {
+      console.error('Failed to refresh site metadata:', apiErrorMessage(error))
+    }
+  }
   const refreshSiteSettings = async () => {
     try {
       const result = await api.getSiteSettings()
@@ -74,7 +82,7 @@ export default function App() {
 
   useEffect(() => {
     void refreshSiteSettings()
-    void api.getSiteMetadata().then((result) => { if (result.success) setMetadata(result.metadata || {}) }).catch((error) => console.error('Failed to load site metadata:', apiErrorMessage(error)))
+    void refreshMetadata()
     let active = true
     void api.currentUser()
       .then((result) => {
@@ -217,7 +225,7 @@ export default function App() {
         <Route
           path="/admin"
           element={user.isAdmin
-            ? <AdminPage users={users} configs={configs} terminals={terminals} events={events} charges={charges} onUsersChanged={refreshUsers} onConfigsChanged={refreshAdminConfigs} onTerminalsChanged={refreshTerminals} onEventsChanged={refreshEvents} onChargesChanged={refreshCharges} />
+            ? <AdminPage users={users} configs={configs} terminals={terminals} events={events} charges={charges} onUsersChanged={refreshUsers} onMetadataChanged={refreshMetadata} onConfigsChanged={refreshAdminConfigs} onTerminalsChanged={refreshTerminals} onEventsChanged={refreshEvents} onChargesChanged={refreshCharges} />
             : <Navigate to="/" replace />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />

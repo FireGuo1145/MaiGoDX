@@ -43,7 +43,7 @@ export function DashboardPage({ stats, metadata }: DashboardPageProps) {
   const rating = stats?.user?.playerRating
   const maxRating = stats?.user?.highestRating
   const playCount = stats?.totalPlays
-  const trend = stats?.trend ?? []
+  const trend = [...(stats?.trend ?? [])].sort((left, right) => left.date.localeCompare(right.date))
 
   return (
     <div className="space-y-8">

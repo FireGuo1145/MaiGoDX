@@ -6,7 +6,7 @@ import type { MetadataItem } from '@/types'
 import { apiErrorMessage } from '@/types'
 
 const kinds = [{ id: 'music', label: '歌曲列表' }, { id: 'partner', label: '搭档列表' }, { id: 'ticket', label: '功能票列表' }, { id: 'chara', label: '旅行伙伴列表' }]
-export function MetadataPanel() {
+export function MetadataPanel({ onChanged }: { onChanged: () => Promise<void> }) {
   const [kind, setKind] = useState('music')
   const [data, setData] = useState<Record<string, MetadataItem[]>>({})
   const [status, setStatus] = useState<string | null>(null)
@@ -18,8 +18,8 @@ export function MetadataPanel() {
   const update = (index: number, field: 'id' | 'name', value: string) => { const next = [...items]; next[index] = { ...next[index], [field]: field === 'id' ? Number(value) : value }; setData({ ...data, [kind]: next }) }
   const add = () => setData({ ...data, [kind]: [...items, { id: 0, name: '' }] })
   const remove = (index: number) => setData({ ...data, [kind]: items.filter((_, i) => i !== index) })
-  const save = async () => { setBusy(true); setStatus(null); try { const result = await api.saveMetadata(kind, items); if (!result.success) throw new Error(result.message || '保存失败'); await refresh(); setStatus(result.message || '保存成功') } catch (error) { setStatus(apiErrorMessage(error)) } finally { setBusy(false) } }
-  const importXML = async (file?: File) => { if (!file) return; setBusy(true); setStatus(null); try { const result = await api.importMetadata(file); if (!result.success) throw new Error(result.message || '导入失败'); await refresh(); setStatus(result.message || '导入成功') } catch (error) { setStatus(apiErrorMessage(error)) } finally { setBusy(false); if (fileRef.current) fileRef.current.value = '' } }
+  const save = async () => { setBusy(true); setStatus(null); try { const result = await api.saveMetadata(kind, items); if (!result.success) throw new Error(result.message || '保存失败'); await refresh(); await onChanged(); setStatus(result.message || '保存成功') } catch (error) { setStatus(apiErrorMessage(error)) } finally { setBusy(false) } }
+  const importXML = async (file?: File) => { if (!file) return; setBusy(true); setStatus(null); try { const result = await api.importMetadata(file); if (!result.success) throw new Error(result.message || '导入失败'); await refresh(); await onChanged(); setStatus(result.message || '导入成功') } catch (error) { setStatus(apiErrorMessage(error)) } finally { setBusy(false); if (fileRef.current) fileRef.current.value = '' } }
   return (
     <Card className="border-slate-800 bg-slate-900">
       <CardHeader><CardTitle className="text-white">站点元数据</CardTitle><p className="text-sm text-slate-400">管理 ID 与名称的显示映射。仅用于门户展示，不会参与存档读写。</p></CardHeader>
@@ -37,4 +37,3 @@ export function MetadataPanel() {
     </Card>
   )
 }
-
