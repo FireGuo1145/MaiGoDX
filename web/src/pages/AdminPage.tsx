@@ -267,10 +267,10 @@ function SiteSettingsPanel({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="development">
+                  <SelectItem id="development">
                     开发模式（不发送邮件）
                   </SelectItem>
-                  <SelectItem value="smtp">SMTP</SelectItem>
+                  <SelectItem id="smtp">SMTP</SelectItem>
                 </SelectContent>
               </Select>
             </label>
