@@ -101,7 +101,7 @@ func serveAimeDBConnection(conn net.Conn) {
 		log.Printf("[MaiGoDX] AimeDB response error: type=0x%02x game=%s keychip=%s remote=%s error=%v", requestType, gameID, keychip, remote, err)
 		return
 	}
-	log.Printf("[MaiGoDX] AimeDB %s: type=0x%02x game=%s keychip=%s remote=%s", summary, requestType, gameID, keychip, remote)
+	log.Printf("[MaiGoDX] AimeDB %s: type=0x%02x response=0x%02x status=%d request_bytes=%d response_bytes=%d encrypted=%t game=%s keychip=%s remote=%s", summary, requestType, binary.LittleEndian.Uint16(response[0x04:0x06]), binary.LittleEndian.Uint16(response[0x08:0x0a]), len(request), len(response), encrypted, gameID, keychip, remote)
 }
 
 func readAimeDBRequest(reader io.Reader) ([]byte, bool, error) {
@@ -176,8 +176,17 @@ func writeAimeDBResponse(writer io.Writer, response []byte, encrypted bool) erro
 			return err
 		}
 	}
-	_, err := writer.Write(payload)
-	return err
+	for len(payload) > 0 {
+		written, err := writer.Write(payload)
+		if err != nil {
+			return err
+		}
+		if written == 0 {
+			return io.ErrShortWrite
+		}
+		payload = payload[written:]
+	}
+	return nil
 }
 
 func cryptAimeDB(source []byte, encrypt bool) ([]byte, error) {
