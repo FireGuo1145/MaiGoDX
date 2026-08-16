@@ -5,7 +5,6 @@ import (
 	"compress/zlib"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
 	"io"
 	"log"
 	"net"
@@ -18,7 +17,11 @@ import (
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
 )
 
-const terminalSessionTTL = 48 * time.Hour
+const (
+	terminalSessionTTL         = 48 * time.Hour
+	terminalSessionTokenLength = 32
+	terminalSessionTokenChars  = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.~"
+)
 
 // HandleAllNetSelfTest implements AquaDX's plain ALL.Net health-check
 // endpoint. Cabinets expect this exact text rather than the web UI fallback.
@@ -205,13 +208,37 @@ func allNetPublicScheme() string {
 }
 
 func createTerminalSession(terminal *model.Terminal, gameID string) (string, error) {
-	bytes := make([]byte, 32)
-	if _, err := rand.Read(bytes); err != nil {
+	token, err := generateTerminalSessionToken()
+	if err != nil {
 		return "", err
 	}
-	token := hex.EncodeToString(bytes)
 	session := model.TerminalSession{Token: token, TerminalID: terminal.ID, GameID: gameID, ExpiresAt: time.Now().Add(terminalSessionTTL)}
 	return token, database.DB.Save(&session).Error
+}
+
+// generateTerminalSessionToken mirrors AquaDX's KeychipSession token format:
+// 32 URL-safe characters selected from [a-zA-Z0-9-_.~].  This exact form is
+// used in the PowerOn /gs/{token}/ URL and avoids clients imposing a shorter
+// path-segment limit than our old 64-character hexadecimal token.
+func generateTerminalSessionToken() (string, error) {
+	const unbiasedLimit = 198 // floor(256 / 66) * 66
+	token := make([]byte, 0, terminalSessionTokenLength)
+	random := make([]byte, terminalSessionTokenLength*2)
+	for len(token) < terminalSessionTokenLength {
+		if _, err := rand.Read(random); err != nil {
+			return "", err
+		}
+		for _, value := range random {
+			if value >= unbiasedLimit {
+				continue
+			}
+			token = append(token, terminalSessionTokenChars[int(value)%len(terminalSessionTokenChars)])
+			if len(token) == terminalSessionTokenLength {
+				break
+			}
+		}
+	}
+	return string(token), nil
 }
 
 func findTerminalByKeychip(value string) (model.Terminal, error) {

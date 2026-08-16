@@ -33,6 +33,21 @@ func TestAllNetTitleServerHealthEndpointsMatchAquaDX(t *testing.T) {
 	}
 }
 
+func TestTerminalSessionTokenMatchesAquaDXFormat(t *testing.T) {
+	token, err := generateTerminalSessionToken()
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+	if len(token) != terminalSessionTokenLength {
+		t.Fatalf("token length=%d, want %d", len(token), terminalSessionTokenLength)
+	}
+	for _, value := range token {
+		if !strings.ContainsRune(terminalSessionTokenChars, value) {
+			t.Fatalf("token contains non-AquaDX character %q: %q", value, token)
+		}
+	}
+}
+
 func TestAllNetPublicHostMatchesAquaDXPrecedence(t *testing.T) {
 	setupMaimaiTestDB(t)
 
