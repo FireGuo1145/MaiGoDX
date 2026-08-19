@@ -33,13 +33,22 @@ func setupTestDB(t *testing.T) {
 
 func request(t *testing.T, endpoint, body string) map[string]any {
 	t.Helper()
-	response := httptest.NewRecorder()
-	Handler(response, httptest.NewRequest(http.MethodPost, "/g/SDDT/1.50/MaimaiServlet/"+endpoint, bytes.NewBufferString(body)))
+	response := performRequest(endpoint, body)
 	var payload map[string]any
 	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
 		t.Fatalf("decode %s response %q: %v", endpoint, response.Body.String(), err)
 	}
 	return payload
+}
+
+func performRequest(endpoint, body string) *httptest.ResponseRecorder {
+	return performVersionedRequest("1.50", endpoint, body)
+}
+
+func performVersionedRequest(version, endpoint, body string) *httptest.ResponseRecorder {
+	response := httptest.NewRecorder()
+	Handler(response, httptest.NewRequest(http.MethodPost, "/g/SDDT/"+version+"/"+endpoint, bytes.NewBufferString(body)))
+	return response
 }
 
 func TestMissingUserPreviewMatchesOngekiShape(t *testing.T) {
@@ -141,9 +150,13 @@ func TestGameSettingUsesRouteVersionAndConfig(t *testing.T) {
 	if err := database.DB.Create(&[]model.SystemConfig{{Key: "ongeki_maintenance_mode", Value: "true"}, {Key: "ongeki_max_count_music", Value: "88"}}).Error; err != nil {
 		t.Fatal(err)
 	}
-	payload := request(t, "GetGameSettingApi", `{}`)
+	response := performVersionedRequest("1.52", "GetGameSettingApi", `{}`)
+	var payload map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
 	setting := payload["gameSetting"].(map[string]any)
-	if setting["dataVersion"] != "1.50.00" || setting["onlineDataVersion"] != "1.50.00" || setting["isMaintenance"] != true || setting["maxCountMusic"] != float64(88) {
+	if setting["dataVersion"] != "1.52" || setting["onlineDataVersion"] != "1.52" || setting["isMaintenance"] != true || setting["maxCountMusic"] != float64(88) {
 		t.Fatalf("setting=%v", setting)
 	}
 }
@@ -195,8 +208,10 @@ func TestAquaDXStaticGameDataDirectory(t *testing.T) {
 	directory := t.TempDir()
 	files := map[string]string{
 		"game_event.json":      `[{"id":1234}]`,
-		"game_gacha.json":      `[{"gachaId":10,"gachaName":"Test"}]`,
-		"game_gacha_card.json": `[{"gachaId":10,"cardId":20,"rarity":2}]`,
+		"game_gacha.json":      `[{"gachaId":10,"gachaName":"Test","kind":1},{"gachaId":1112,"gachaName":"Permanent","kind":0}]`,
+		"game_gacha_card.json": `[{"gachaId":10,"cardId":20,"rarity":2},{"gachaId":1112,"cardId":30,"rarity":3}]`,
+		"game_present.json":    `[{"id":5,"presentName":"Test"}]`,
+		"game_encryption.json": `[{"salt":"01020304","iterations":10}]`,
 	}
 	for name, payload := range files {
 		if err := os.WriteFile(filepath.Join(directory, name), []byte(payload), 0o600); err != nil {
@@ -211,15 +226,108 @@ func TestAquaDXStaticGameDataDirectory(t *testing.T) {
 		t.Fatalf("events=%v", events)
 	}
 	gachas := request(t, "GetGameGachaApi", `{}`)
-	if gachas["length"] != float64(1) {
+	if gachas["length"] != float64(2) {
 		t.Fatalf("gachas=%v", gachas)
 	}
 	cards := request(t, "GetGameGachaCardByIdApi", `{"gachaId":10}`)
 	if cards["length"] != float64(1) {
 		t.Fatalf("cards=%v", cards)
 	}
-	rolled := request(t, "RollGachaApi", `{"gachaId":10,"times":2}`)
+	request(t, "UpsertUserAllApi", `{"userId":9,"upsertUserAll":{"userData":[{"userName":"Gacha"}]}}`)
+	rolled := request(t, "RollGachaApi", `{"userId":9,"gachaId":10,"times":2}`)
 	if rolled["length"] != float64(2) {
 		t.Fatalf("rolled=%v", rolled)
+	}
+	presents := request(t, "GetGamePresentApi", `{}`)
+	present := presents["gamePresentList"].([]any)[0].(map[string]any)
+	if present["startDate"] != "2000-01-01 05:00:00.0" || present["endDate"] != "2099-01-01 05:00:00.0" {
+		t.Fatalf("presents=%v", presents)
+	}
+	hash := hex.EncodeToString(pbkdf2.Key([]byte("GetGameSettingApi"), []byte{1, 2, 3, 4}, 10, 16, sha1.New))
+	if resolved := resolveEndpoint(hash); resolved != "GetGameSettingApi" {
+		t.Fatalf("static encryption resolved=%q", resolved)
+	}
+
+	request(t, "CMUpsertUserGachaApi", `{"userId":9,"gachaId":10,"gachaCnt":1,"selectPoint":0,"cmUpsertUserGacha":{"userData":[{"userName":"Gacha"}]}}`)
+	guaranteed := request(t, "RollGachaApi", `{"userId":9,"gachaId":10,"times":5}`)
+	first := guaranteed["gameGachaCardList"].([]any)[0].(map[string]any)
+	if first["rarity"] != float64(3) || first["gachaId"] != float64(1112) {
+		t.Fatalf("first five pull did not use permanent SR guarantee: %v", guaranteed)
+	}
+}
+
+func TestRivalDataAndMusicMatchAquaDXShape(t *testing.T) {
+	setupTestDB(t)
+	request(t, "UpsertUserAllApi", `{"userId":101,"upsertUserAll":{"userData":[{"userName":"Alpha"}],"userMusicDetailList":[{"musicId":7,"level":2,"techScoreMax":1000000},{"musicId":7,"level":3,"techScoreMax":1005000},{"musicId":8,"level":1,"techScoreMax":990000}]}}`)
+	request(t, "UpsertUserAllApi", `{"userId":102,"upsertUserAll":{"userData":[{"userName":"Beta"}]}}`)
+
+	response := performRequest("GetUserRivalDataApi", `{"userId":1,"userRivalList":[{"rivalUserId":102},{"rivalUserId":999},{"rivalUserId":101}]}`)
+	var rivals []map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&rivals); err != nil {
+		t.Fatal(err)
+	}
+	if len(rivals) != 2 || rivals[0]["rivalUserName"] != "Beta" || rivals[1]["rivalUserName"] != "Alpha" {
+		t.Fatalf("rivals=%v", rivals)
+	}
+
+	music := request(t, "GetUserRivalMusicApi", `{"userId":1,"rivalUserId":101}`)
+	groups := music["userRivalMusicList"].([]any)
+	if music["rivalUserId"] != float64(101) || len(groups) != 2 || groups[0].(map[string]any)["length"] != float64(2) {
+		t.Fatalf("rival music=%v", music)
+	}
+}
+
+func TestEventRankingCountsUsersWithHigherPoints(t *testing.T) {
+	setupTestDB(t)
+	for _, entry := range []struct {
+		userID int
+		point  int
+	}{{1, 300}, {2, 900}, {3, 500}, {4, 300}} {
+		request(t, "UpsertUserAllApi", `{"userId":`+strconv.Itoa(entry.userID)+`,"upsertUserAll":{"userData":[{"userName":"Rank"}],"userEventPointList":[{"eventId":77,"point":`+strconv.Itoa(entry.point)+`}]}}`)
+	}
+	ranking := request(t, "GetUserEventRankingApi", `{"userId":3}`)
+	value := ranking["userEventRankingList"].([]any)[0].(map[string]any)
+	if value["rank"] != float64(2) || value["point"] != float64(500) {
+		t.Fatalf("ranking=%v", ranking)
+	}
+}
+
+func TestDailyGachaCountResetsAcrossCalendarDays(t *testing.T) {
+	setupTestDB(t)
+	if err := saveRecord(database.DB, 9, "userGachaList", "10", map[string]any{
+		"gachaId": 10, "totalGachaCnt": 10, "dailyGachaCnt": 10, "dailyGachaDate": "2000-01-01 00:00:00",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	request(t, "CMUpsertUserGachaApi", `{"userId":9,"gachaId":10,"gachaCnt":2,"selectPoint":0,"cmUpsertUserGacha":{"userData":[{"userName":"Gacha"}]}}`)
+	state := request(t, "GetUserGachaApi", `{"userId":9}`)["userGachaList"].([]any)[0].(map[string]any)
+	if state["dailyGachaCnt"] != float64(2) || state["totalGachaCnt"] != float64(12) {
+		t.Fatalf("state=%v", state)
+	}
+}
+
+func TestCardMakerMissingUserReturnsBadRequest(t *testing.T) {
+	setupTestDB(t)
+	response := performRequest("CMGetUserDataApi", `{"userId":404}`)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestRollGachaRejectsMissingUserAndUnknownGacha(t *testing.T) {
+	setupTestDB(t)
+	directory := t.TempDir()
+	if err := os.WriteFile(filepath.Join(directory, "game_gacha.json"), []byte(`[{"gachaId":10,"kind":0}]`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.Create(&model.SystemConfig{Key: "ongeki_game_data_dir", Value: directory}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if response := performRequest("RollGachaApi", `{"userId":404,"gachaId":10,"times":1}`); response.Code != http.StatusBadRequest {
+		t.Fatalf("missing user status=%d body=%s", response.Code, response.Body.String())
+	}
+	request(t, "UpsertUserAllApi", `{"userId":9,"upsertUserAll":{"userData":[{"userName":"Gacha"}]}}`)
+	if response := performRequest("RollGachaApi", `{"userId":9,"gachaId":999,"times":1}`); response.Code != http.StatusNotFound {
+		t.Fatalf("unknown gacha status=%d body=%s", response.Code, response.Body.String())
 	}
 }

@@ -97,8 +97,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		handleUpsertUserAll(w, request, userID)
 	case "CMUpsertUserAll", "CMUpsertUserGacha", "CMUpsertUserSelectGacha":
 		handleCardMakerUpsert(w, endpoint, request, userID)
-	case "GetUserData", "CMGetUserData":
+	case "GetUserData":
 		handleGetUserData(w, userID)
+	case "CMGetUserData":
+		handleCMGetUserData(w, userID)
 	case "GetUserPreview":
 		handleGetUserPreview(w, userID)
 	case "GetUserOption":
@@ -125,9 +127,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		key := lowerFirst(strings.TrimPrefix(endpoint, "Get")) + "List"
 		writeUnpaged(w, userID, key, []map[string]any{}, nil)
 	case "GetUserRivalData":
-		writePayload(w, []any{})
+		handleGetUserRivalData(w, request)
 	case "GetUserRivalMusic":
-		writeUnpaged(w, userID, "userRivalMusicList", []map[string]any{}, map[string]any{"rivalUserId": int64Value(request["rivalUserId"])})
+		handleGetUserRivalMusic(w, userID, request)
 	case "GetGameSetting":
 		writePayload(w, gameSetting(request))
 	case "GetGameEvent":
@@ -135,7 +137,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	case "GetGamePoint":
 		writePayload(w, gamePoints())
 	case "GetGamePresent":
-		writePayload(w, staticGameListPayload("game_present.json", "gamePresentList"))
+		writePayload(w, gamePresents())
 	case "GetGameReward":
 		writePayload(w, staticGameListPayload("game_reward.json", "gameRewardList"))
 	case "GetGameTechMusic":
@@ -157,7 +159,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	case "GetGameGachaCardById":
 		writePayload(w, gameGachaCards(int64Value(request["gachaId"])))
 	case "RollGacha":
-		writePayload(w, rollGacha(request))
+		if !ongekiUserExists(userID) {
+			writeOngekiError(w, http.StatusBadRequest, "User not found")
+			return
+		}
+		if _, exists := findGacha(int64Value(request["gachaId"])); !exists {
+			writeOngekiError(w, http.StatusNotFound, "Gacha not found")
+			return
+		}
+		writePayload(w, rollGacha(userID, request))
 	case "CMGetUserGachaSupply":
 		writePayload(w, map[string]any{"supplyId": 0, "length": 0, "supplyCardList": []any{}})
 	case "GetGameTheater":
@@ -262,14 +272,28 @@ func updateUserGacha(tx *gorm.DB, userID int64, request map[string]any) error {
 	selectPoint := intValue(request["selectPoint"])
 	key := strconv.FormatInt(gachaID, 10)
 	state := existingRecord(tx, userID, "userGachaList", key)
-	if len(state) == 0 {
-		state = map[string]any{"gachaId": gachaID, "dailyGachaDate": time.Now().Format("2006-01-02 15:04:05")}
+	isNew := len(state) == 0
+	now := time.Now()
+	if isNew {
+		state = map[string]any{
+			"gachaId": gachaID, "totalGachaCnt": 0, "selectPoint": 0, "useSelectPoint": 0,
+			"ceilingGachaCnt": 0, "fiveGachaCnt": 0, "elevenGachaCnt": 0, "dailyGachaCnt": 0,
+		}
 	}
 	state["totalGachaCnt"] = intValue(state["totalGachaCnt"]) + pullCount
-	state["dailyGachaCnt"] = intValue(state["dailyGachaCnt"]) + pullCount
+	if sameCalendarDay(stringValue(state["dailyGachaDate"]), now) {
+		state["dailyGachaCnt"] = intValue(state["dailyGachaCnt"]) + pullCount
+	} else {
+		state["dailyGachaCnt"] = pullCount
+	}
+	state["dailyGachaDate"] = now.Format("2006-01-02 15:04:05")
 	if selectPoint > 0 {
 		state["selectPoint"] = intValue(state["selectPoint"]) + selectPoint
-		state["ceilingGachaCnt"] = intValue(state["ceilingGachaCnt"]) + pullCount
+		if isNew {
+			state["ceilingGachaCnt"] = 1
+		} else {
+			state["ceilingGachaCnt"] = intValue(state["ceilingGachaCnt"]) + pullCount
+		}
 	}
 	if pullCount == 5 {
 		state["fiveGachaCnt"] = intValue(state["fiveGachaCnt"]) + 1
@@ -278,6 +302,18 @@ func updateUserGacha(tx *gorm.DB, userID int64, request map[string]any) error {
 		state["elevenGachaCnt"] = intValue(state["elevenGachaCnt"]) + 1
 	}
 	return saveRecord(tx, userID, "userGachaList", key, state)
+}
+
+func sameCalendarDay(value string, now time.Time) bool {
+	for _, layout := range []string{"2006-01-02 15:04:05.999999999", "2006-01-02 15:04:05", time.RFC3339Nano} {
+		parsed, err := time.ParseInLocation(layout, value, now.Location())
+		if err == nil {
+			year, month, day := parsed.Date()
+			nowYear, nowMonth, nowDay := now.Date()
+			return year == nowYear && month == nowMonth && day == nowDay
+		}
+	}
+	return false
 }
 
 func useUserGachaSelection(tx *gorm.DB, userID int64, request map[string]any) error {
@@ -292,7 +328,10 @@ func useUserGachaSelection(tx *gorm.DB, userID int64, request map[string]any) er
 	key := strconv.FormatInt(gachaID, 10)
 	state := existingRecord(tx, userID, "userGachaList", key)
 	if len(state) == 0 {
-		state = map[string]any{"gachaId": gachaID}
+		state = map[string]any{
+			"gachaId": gachaID, "totalGachaCnt": 0, "selectPoint": 0, "useSelectPoint": 0,
+			"ceilingGachaCnt": 0, "fiveGachaCnt": 0, "elevenGachaCnt": 0, "dailyGachaCnt": 0,
+		}
 	}
 	state["selectPoint"] = 0
 	state["useSelectPoint"] = 1
@@ -443,6 +482,29 @@ func handleGetUserData(w http.ResponseWriter, userID int64) {
 	writePayload(w, map[string]any{"userId": userID, "userData": decodeJSON(profile.ProfileJSON)})
 }
 
+func handleCMGetUserData(w http.ResponseWriter, userID int64) {
+	var profile model.OngekiUser
+	result := database.DB.Where("user_id = ?", userID).Limit(1).Find(&profile)
+	if result.Error != nil || result.RowsAffected == 0 {
+		writeOngekiError(w, http.StatusBadRequest, "User not found")
+		return
+	}
+	writePayload(w, map[string]any{"userId": userID, "userData": decodeJSON(profile.ProfileJSON)})
+}
+
+func ongekiUserExists(userID int64) bool {
+	if userID <= 0 {
+		return false
+	}
+	var count int64
+	return database.DB.Model(&model.OngekiUser{}).Where("user_id = ?", userID).Count(&count).Error == nil && count > 0
+}
+
+func writeOngekiError(w http.ResponseWriter, status int, message string) {
+	w.WriteHeader(status)
+	writePayload(w, map[string]any{"message": message})
+}
+
 func handleGetUserPreview(w http.ResponseWriter, userID int64) {
 	var profile model.OngekiUser
 	result := database.DB.Where("user_id = ?", userID).Limit(1).Find(&profile)
@@ -547,18 +609,98 @@ func handleEventRanking(w http.ResponseWriter, userID int64) {
 	values := records(userID, "userEventPointList")
 	result := make([]map[string]any, 0, len(values))
 	for _, value := range values {
-		result = append(result, map[string]any{"eventId": value["eventId"], "type": 1, "date": now, "rank": 1, "point": value["point"]})
+		eventID := int64Value(value["eventId"])
+		point := int64Value(value["point"])
+		result = append(result, map[string]any{"eventId": value["eventId"], "type": 1, "date": now, "rank": eventRank(eventID, point), "point": value["point"]})
 	}
 	writeUnpaged(w, userID, "userEventRankingList", result, nil)
+}
+
+func eventRank(eventID, point int64) int {
+	var rows []model.OngekiUserRecord
+	database.DB.Where("kind = ?", "userEventPointList").Find(&rows)
+	pointsByUser := make(map[int64]int64)
+	for _, row := range rows {
+		value := decodeJSON(row.DataJSON)
+		if int64Value(value["eventId"]) != eventID {
+			continue
+		}
+		candidate := int64Value(value["point"])
+		if previous, ok := pointsByUser[row.UserID]; !ok || candidate > previous {
+			pointsByUser[row.UserID] = candidate
+		}
+	}
+	rank := 1
+	for _, candidate := range pointsByUser {
+		if candidate > point {
+			rank++
+		}
+	}
+	return rank
+}
+
+func handleGetUserRivalData(w http.ResponseWriter, request map[string]any) {
+	requested := objectList(request["userRivalList"])
+	ids := make([]int64, 0, len(requested))
+	seen := make(map[int64]struct{}, len(requested))
+	for _, rival := range requested {
+		id := int64Value(rival["rivalUserId"])
+		if id <= 0 {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		writePayload(w, []any{})
+		return
+	}
+	var profiles []model.OngekiUser
+	database.DB.Where("user_id IN ?", ids).Find(&profiles)
+	byID := make(map[int64]model.OngekiUser, len(profiles))
+	for _, profile := range profiles {
+		byID[profile.UserID] = profile
+	}
+	result := make([]map[string]any, 0, len(profiles))
+	for _, id := range ids {
+		if profile, ok := byID[id]; ok {
+			result = append(result, map[string]any{"rivalUserId": profile.UserID, "rivalUserName": profile.UserName})
+		}
+	}
+	writePayload(w, result)
+}
+
+func handleGetUserRivalMusic(w http.ResponseWriter, userID int64, request map[string]any) {
+	rivalUserID := int64Value(request["rivalUserId"])
+	var details []model.OngekiMusicDetail
+	database.DB.Where("user_id = ?", rivalUserID).Order("music_id asc, level asc").Find(&details)
+	groups := make([]map[string]any, 0)
+	currentMusicID := -1
+	var current []map[string]any
+	flush := func() {
+		if current != nil {
+			groups = append(groups, map[string]any{"userRivalMusicDetailList": current, "length": len(current)})
+		}
+	}
+	for _, detail := range details {
+		if detail.MusicID != currentMusicID {
+			flush()
+			currentMusicID = detail.MusicID
+			current = []map[string]any{}
+		}
+		current = append(current, decodeJSON(detail.DetailJSON))
+	}
+	flush()
+	writeUnpaged(w, userID, "userRivalMusicList", groups, map[string]any{"rivalUserId": rivalUserID})
 }
 
 func gameSetting(request map[string]any) map[string]any {
 	version := stringValue(request["version"])
 	if version == "" {
 		version = "1.50.00"
-	}
-	if strings.Count(version, ".") == 1 {
-		version += ".00"
 	}
 	return map[string]any{"isAou": false, "isDumpUpload": false, "gameSetting": map[string]any{
 		"dataVersion": version, "onlineDataVersion": version, "isMaintenance": configBool("ongeki_maintenance_mode", false),
@@ -633,6 +775,14 @@ func firstRecord(userID int64, kind string) map[string]any {
 	return values[0]
 }
 
+func firstRecordByKey(userID int64, kind, key string) map[string]any {
+	var row model.OngekiUserRecord
+	if database.DB.Where("user_id = ? AND kind = ? AND record_key = ?", userID, kind, key).Limit(1).Find(&row).RowsAffected == 0 {
+		return nil
+	}
+	return decodeJSON(row.DataJSON)
+}
+
 func recordKey(value map[string]any, index int) string {
 	if value["activityId"] != nil {
 		return strconv.Itoa(intValue(value["kind"])) + ":" + strconv.Itoa(intValue(value["activityId"]))
@@ -705,6 +855,15 @@ func endpointSaltSpecs() []endpointSalt {
 		iterations, iterErr := strconv.Atoi(parts[1])
 		if err == nil && iterErr == nil && iterations > 0 {
 			result = append(result, endpointSalt{salt: salt, iterations: iterations})
+		}
+	}
+	if strings.TrimSpace(value) == "" {
+		for _, entry := range loadGameData("game_encryption.json") {
+			salt, err := hex.DecodeString(stringValue(entry["salt"]))
+			iterations := intValue(entry["iterations"])
+			if err == nil && len(salt) > 0 && iterations > 0 {
+				result = append(result, endpointSalt{salt: salt, iterations: iterations})
+			}
 		}
 	}
 	return result
