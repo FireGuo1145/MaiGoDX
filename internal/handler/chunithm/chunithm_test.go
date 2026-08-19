@@ -20,7 +20,7 @@ func setupTestDB(t *testing.T) {
 		t.Fatalf("open test database: %v", err)
 	}
 	database.DB = db
-	if err := db.AutoMigrate(&model.ChuniUser{}, &model.ChuniMusicDetail{}, &model.ChuniPlaylog{}, &model.ChuniUserRecord{}, &model.GameEvent{}, &model.GameCharge{}); err != nil {
+	if err := db.AutoMigrate(&model.ChuniUser{}, &model.ChuniMusicDetail{}, &model.ChuniPlaylog{}, &model.ChuniUserRecord{}, &model.GameEvent{}, &model.GameCharge{}, &model.SystemConfig{}); err != nil {
 		t.Fatalf("migrate test database: %v", err)
 	}
 }
@@ -74,6 +74,7 @@ func TestGetUserDataAndMusicReturnPersistedPayloads(t *testing.T) {
 }
 
 func TestGameSettingReturnsChuniServletAddress(t *testing.T) {
+	setupTestDB(t)
 	response := httptest.NewRecorder()
 	Handler(response, httptest.NewRequest(http.MethodPost, "/g/SDHD/2.00/ChuniServlet/GetGameSettingApi", bytes.NewBufferString(`{"version":"2.00"}`)))
 	var payload map[string]any
@@ -83,6 +84,30 @@ func TestGameSettingReturnsChuniServletAddress(t *testing.T) {
 	setting := payload["gameSetting"].(map[string]any)
 	if setting["matchingUri"] == "" {
 		t.Fatal("missing matchingUri")
+	}
+}
+
+func TestGameSettingUsesChuniConfig(t *testing.T) {
+	setupTestDB(t)
+	configs := []model.SystemConfig{
+		{Key: "chuni_maintenance_mode", Value: "true"},
+		{Key: "chuni_matching_uri", Value: "https://matching.example/"},
+		{Key: "chuni_reflector_uri", Value: "https://reflector.example/"},
+		{Key: "chuni_max_count_music", Value: "480"},
+	}
+	if err := database.DB.Create(&configs).Error; err != nil {
+		t.Fatalf("create configs: %v", err)
+	}
+
+	response := httptest.NewRecorder()
+	Handler(response, httptest.NewRequest(http.MethodPost, "/g/SDHD/2.00/ChuniServlet/GetGameSettingApi", bytes.NewBufferString(`{"version":"2.00"}`)))
+	var payload map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	setting := payload["gameSetting"].(map[string]any)
+	if setting["isMaintenance"] != true || setting["matchingUri"] != "https://matching.example/" || setting["matchingUriX"] != "https://matching.example/" || setting["reflectorUri"] != "https://reflector.example/" || setting["maxCountMusic"] != float64(480) {
+		t.Fatalf("unexpected game setting: %v", setting)
 	}
 }
 

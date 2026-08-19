@@ -56,6 +56,7 @@ func main() {
 	mux.HandleFunc("/api/card/bind", handler.HandleBindCard)
 	mux.HandleFunc("/api/card/list", handler.HandleGetUserCards)
 	mux.HandleFunc("/api/stats", handler.HandleGetStats)
+	mux.HandleFunc("/api/chunithm/stats", handler.HandleGetChuniStats)
 	mux.HandleFunc("/api/maimai/profile/update", handler.HandleUpdatePortalProfile)
 	mux.HandleFunc("/api/maimai/profile/ticket/adjust", handler.HandleAdjustPortalFunctionTicket)
 	mux.HandleFunc("/sys/test", handler.HandleAllNetSelfTest)

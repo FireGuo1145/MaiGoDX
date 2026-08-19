@@ -372,6 +372,10 @@ function isAimeConfig(config: SystemConfig) {
   return config.key.startsWith("allnet_")
 }
 
+function isChuniConfig(config: SystemConfig) {
+  return config.key.startsWith("chuni_")
+}
+
 export function AdminPage({
   users,
   configs,
@@ -597,6 +601,12 @@ export function AdminPage({
               >
                 maimai DX
               </TabsTrigger>
+              <TabsTrigger
+                id="chunithm"
+                className="min-w-fit rounded-lg px-3 text-muted-foreground data-selected:text-foreground"
+              >
+                CHUNITHM
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent id="aime" className="space-y-4">
@@ -618,7 +628,24 @@ export function AdminPage({
               {configs
                 .filter(
                   (config) =>
-                    !siteConfigKeys.has(config.key) && !isAimeConfig(config)
+                    !siteConfigKeys.has(config.key) &&
+                    !isAimeConfig(config) &&
+                    !isChuniConfig(config)
+                )
+                .map((config) => (
+                  <ConfigRow
+                    key={config.ID}
+                    config={config}
+                    onSaved={onConfigsChanged}
+                  />
+                ))}
+            </TabsContent>
+
+            <TabsContent id="chunithm" className="space-y-4">
+              {configs
+                .filter(
+                  (config) =>
+                    !siteConfigKeys.has(config.key) && isChuniConfig(config)
                 )
                 .map((config) => (
                   <ConfigRow

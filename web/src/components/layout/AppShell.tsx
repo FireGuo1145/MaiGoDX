@@ -52,6 +52,7 @@ interface NavigationItem {
 const navigation: NavigationItem[] = [
   { id: "home", label: "主页", icon: Home },
   { id: "maimai", label: "maimai DX", icon: Gamepad2 },
+  { id: "chunithm", label: "CHUNITHM", icon: Gamepad2 },
   { id: "setup", label: "接入指南", icon: Server },
   { id: "admin", label: "管理后台", icon: Users, adminOnly: true },
   { id: "settings", label: "设置", icon: Settings },

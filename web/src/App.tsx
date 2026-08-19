@@ -12,6 +12,7 @@ import { AdminPage } from "@/pages/AdminPage"
 import { AuthPage } from "@/pages/AuthPage"
 import { HomePage } from "@/pages/HomePage"
 import { MaimaiPage } from "@/pages/MaimaiPage"
+import { ChuniPage } from "@/pages/ChuniPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { SetupPage } from "@/pages/SetupPage"
 import type {
@@ -25,12 +26,14 @@ import type {
   Terminal,
   UserAccount,
   UserCard,
+  ChuniStats,
 } from "@/types"
 import { apiErrorMessage } from "@/types"
 
 const pageTitles: Record<PageId, string> = {
   home: "主页",
   maimai: "maimai DX",
+  chunithm: "CHUNITHM",
   setup: "接入指南",
   admin: "管理后台",
   settings: "设置",
@@ -39,6 +42,7 @@ const pageTitles: Record<PageId, string> = {
 const pagePaths: Record<PageId, string> = {
   home: "/",
   maimai: "/maimai",
+  chunithm: "/chunithm",
   setup: "/setup",
   admin: "/admin",
   settings: "/settings",
@@ -68,6 +72,7 @@ export default function App() {
     () => typeof window !== "undefined" && window.innerWidth >= 768
   )
   const [stats, setStats] = useState<Stats | null>(null)
+  const [chuniStats, setChuniStats] = useState<ChuniStats | null>(null)
   const [selectedProfileCardID, setSelectedProfileCardID] = useState<
     number | undefined
   >()
@@ -149,6 +154,16 @@ export default function App() {
     }
   }
 
+  const refreshChuniStats = async (cardID = selectedProfileCardID) => {
+    if (!user) return
+    try {
+      const result = await api.getChuniStats(cardID)
+      if (result.success) setChuniStats(result)
+    } catch (error) {
+      console.error("Failed to load CHUNITHM stats:", apiErrorMessage(error))
+    }
+  }
+
   const refreshUsers = async () => {
     try {
       const result = await api.getUsers()
@@ -199,6 +214,7 @@ export default function App() {
   useEffect(() => {
     if (!user) return
     void refreshStats()
+    void refreshChuniStats()
     void refreshCards()
     if (user.isAdmin) {
       void refreshUsers()
@@ -213,6 +229,7 @@ export default function App() {
     void api.logout()
     setUser(null)
     setStats(null)
+    setChuniStats(null)
     setSelectedProfileCardID(undefined)
     setCards([])
     setUsers([])
@@ -256,6 +273,7 @@ export default function App() {
       onProfileCardSelected={(cardID) => {
         setSelectedProfileCardID(cardID)
         void refreshStats(cardID)
+        void refreshChuniStats(cardID)
       }}
     >
       <Routes>
@@ -270,6 +288,10 @@ export default function App() {
               onProfileChanged={() => refreshStats(selectedProfileCardID)}
             />
           }
+        />
+        <Route
+          path="/chunithm"
+          element={<ChuniPage stats={chuniStats} />}
         />
         <Route path="/setup" element={<SetupPage />} />
         <Route

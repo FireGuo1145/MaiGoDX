@@ -47,6 +47,22 @@ var chuniUserLists = map[string][2]string{
 	"GetUserLoginBonus":         {"userLoginBonusList", "userLoginBonusList"},
 }
 
+func chuniConfig(key, fallback string) string {
+	var config model.SystemConfig
+	if database.DB.Where("key = ?", key).First(&config).Error != nil || strings.TrimSpace(config.Value) == "" {
+		return fallback
+	}
+	return strings.TrimSpace(config.Value)
+}
+
+func chuniConfigInt(key string, fallback int) int {
+	value, err := strconv.Atoi(chuniConfig(key, strconv.Itoa(fallback)))
+	if err != nil || value < 0 {
+		return fallback
+	}
+	return value
+}
+
 // Handler implements the JSON servlet used by CHUNITHM cabinets on SDHD and
 // SDGS routes. It deliberately accepts unknown optional APIs as no-ops, as
 // AquaDX does, so mixed client revisions can complete their boot sequence.
@@ -211,13 +227,23 @@ func gameSetting(r *http.Request, request map[string]any) map[string]any {
 	}
 	now := time.Now().UTC()
 	base := "http://" + r.Host + "/g/SDHD/" + version + "/ChuniServlet/"
-	return map[string]any{"gameSetting": map[string]any{
-		"romVersion": version + ".00", "dataVersion": version + ".00", "isMaintenance": false, "requestInterval": 0,
+	matchingURI := chuniConfig("chuni_matching_uri", base)
+	reflectorURI := chuniConfig("chuni_reflector_uri", "")
+	game := map[string]any{
+		"romVersion": version + ".00", "dataVersion": version + ".00",
+		"isMaintenance": strings.EqualFold(chuniConfig("chuni_maintenance_mode", "false"), "true"), "requestInterval": 0,
 		"rebootStartTime": now.Add(-4 * time.Hour).Format("2006-01-02 15:04:05"), "rebootEndTime": now.Add(-3 * time.Hour).Format("2006-01-02 15:04:05"),
-		"isBackgroundDistribute": false, "maxCountCharacter": 300, "maxCountItem": 300, "maxCountMusic": 300,
-		"matchStartTime": now.Format("2006-01-02") + " 00:01:00", "matchEndTime": now.Format("2006-01-02") + " 23:59:00", "matchTimeLimit": 10, "matchErrorLimit": 10,
-		"matchingUri": base, "matchingUriX": base,
-	}, "isDumpUpload": false, "isAou": false}
+		"isBackgroundDistribute": false,
+		"maxCountCharacter":      chuniConfigInt("chuni_max_count_character", 300),
+		"maxCountItem":           chuniConfigInt("chuni_max_count_item", 300),
+		"maxCountMusic":          chuniConfigInt("chuni_max_count_music", 300),
+		"matchStartTime":         now.Format("2006-01-02") + " 00:01:00", "matchEndTime": now.Format("2006-01-02") + " 23:59:00", "matchTimeLimit": 10, "matchErrorLimit": 10,
+		"matchingUri": matchingURI, "matchingUriX": matchingURI,
+	}
+	if reflectorURI != "" {
+		game["reflectorUri"] = reflectorURI
+	}
+	return map[string]any{"gameSetting": game, "isDumpUpload": false, "isAou": false}
 }
 
 func pagedResponse(endpoint string, userID int64, request map[string]any) map[string]any {
