@@ -20,7 +20,7 @@ func setupTestDB(t *testing.T) {
 		t.Fatalf("open test database: %v", err)
 	}
 	database.DB = db
-	if err := db.AutoMigrate(&model.ChuniUser{}, &model.ChuniMusicDetail{}, &model.ChuniPlaylog{}); err != nil {
+	if err := db.AutoMigrate(&model.ChuniUser{}, &model.ChuniMusicDetail{}, &model.ChuniPlaylog{}, &model.ChuniUserRecord{}, &model.GameEvent{}, &model.GameCharge{}); err != nil {
 		t.Fatalf("migrate test database: %v", err)
 	}
 }
@@ -98,5 +98,62 @@ func TestKnownGameListAPIHasAnEmptyListPayload(t *testing.T) {
 	}
 	if _, ok := payload["gameEventList"].([]any); !ok {
 		t.Fatalf("gameEventList=%T, want []any", payload["gameEventList"])
+	}
+}
+
+func TestUpsertUserAllRoundTripsGenericCollections(t *testing.T) {
+	setupTestDB(t)
+	body := []byte(`{
+    "userId": 102,
+    "upsertUserAll": {
+      "userData": [{"userName": "Collections"}],
+      "userGameOption": [{"playerLevel": 12, "headphone": 7}],
+      "userItemList": [
+        {"itemKind": 5, "itemId": 8000, "stock": 3, "isValid": true},
+        {"itemKind": 6, "itemId": 10, "stock": 1, "isValid": true}
+      ],
+      "userCharacterList": [{"characterId": 100, "level": 4}]
+    }
+  }`)
+	Handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/g/SDHD/2.00/ChuniServlet/UpsertUserAllApi", bytes.NewReader(body)))
+
+	optionResponse := httptest.NewRecorder()
+	Handler(optionResponse, httptest.NewRequest(http.MethodPost, "/g/SDHD/2.00/ChuniServlet/GetUserOptionApi", bytes.NewBufferString(`{"userId":102}`)))
+	var option map[string]any
+	if err := json.NewDecoder(optionResponse.Body).Decode(&option); err != nil {
+		t.Fatalf("decode option: %v", err)
+	}
+	if option["userGameOption"].(map[string]any)["playerLevel"] != float64(12) {
+		t.Fatalf("option=%v", option)
+	}
+
+	itemsResponse := httptest.NewRecorder()
+	Handler(itemsResponse, httptest.NewRequest(http.MethodPost, "/g/SDHD/2.00/ChuniServlet/GetUserItemApi", bytes.NewBufferString(`{"userId":102,"kind":5}`)))
+	var items map[string]any
+	if err := json.NewDecoder(itemsResponse.Body).Decode(&items); err != nil {
+		t.Fatalf("decode items: %v", err)
+	}
+	values := items["userItemList"].([]any)
+	if len(values) != 1 || values[0].(map[string]any)["itemId"] != float64(8000) {
+		t.Fatalf("items=%v", items)
+	}
+}
+
+func TestMatchingRoomLifecycle(t *testing.T) {
+	matching.Lock()
+	matching.nextID = 0
+	matching.rooms = map[int]*matchingRoom{}
+	matching.Unlock()
+
+	first := beginMatching(map[string]any{"matchingMemberInfo": map[string]any{"userId": 1}})
+	roomID := first["roomId"].(int)
+	beginMatching(map[string]any{"matchingMemberInfo": map[string]any{"userId": 2}})
+	state := matchingState(map[string]any{"roomId": roomID})
+	if state["matchingWaitState"].(map[string]any)["matchingMemberCount"] != 2 {
+		t.Fatalf("state=%v", state)
+	}
+	result := endMatching(map[string]any{"roomId": roomID})
+	if result["matchingResult"] != 1 {
+		t.Fatalf("result=%v", result)
 	}
 }

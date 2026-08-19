@@ -6,12 +6,46 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
 	"gorm.io/gorm"
 )
+
+type matchingRoom struct {
+	members []map[string]any
+	started time.Time
+}
+
+var matching = struct {
+	sync.Mutex
+	nextID int
+	rooms  map[int]*matchingRoom
+}{rooms: map[int]*matchingRoom{}}
+
+var chuniUserLists = map[string][2]string{
+	"GetUserItem":               {"userItemList", "userItemList"},
+	"GetUserCharacter":          {"userCharacterList", "userCharacterList"},
+	"GetUserMapArea":            {"userMapAreaList", "userMapAreaList"},
+	"GetUserCourse":             {"userCourseList", "userCourseList"},
+	"GetUserCharge":             {"userChargeList", "userChargeList"},
+	"GetUserDuel":               {"userDuelList", "userDuelList"},
+	"GetUserGacha":              {"userGachaList", "userGachaList"},
+	"GetUserActivity":           {"userActivityList", "userActivityList"},
+	"GetUserRecentRating":       {"userRecentRatingList", "userRecentRatingList"},
+	"GetUserMate":               {"userMateList", "userMateList"},
+	"GetUserRegion":             {"userRegionList", "userRegionList"},
+	"GetUserFavoriteItem":       {"userFavoriteItemList", "userFavoriteItemList"},
+	"GetUserFavoriteCollection": {"userFavoriteCollectionList", "userFavoriteCollectionList"},
+	"GetUserCMission":           {"userCMissionList", "userCMissionList"},
+	"GetUserCMissionList":       {"userCMissionList", "userCMissionList"},
+	"GetUserLV":                 {"userLinkedVerseList", "userLinkedVerseList"},
+	"GetUserUC":                 {"userUnlockChallengeList", "userUnlockChallengeList"},
+	"GetUserCardPrintError":     {"userCardPrintStateList", "userCardPrintErrorList"},
+	"GetUserLoginBonus":         {"userLoginBonusList", "userLoginBonusList"},
+}
 
 // Handler implements the JSON servlet used by CHUNITHM cabinets on SDHD and
 // SDGS routes. It deliberately accepts unknown optional APIs as no-ops, as
@@ -29,21 +63,44 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	switch endpoint {
 	case "UpsertUserAll":
 		handleUpsertUserAll(w, request, userID)
-	case "GetUserData":
+	case "GetUserData", "CMGetUserData":
 		handleGetUserData(w, userID)
-	case "GetUserPreview":
+	case "GetUserPreview", "CMGetUserPreview":
 		handleGetUserPreview(w, userID)
 	case "GetUserMusic":
 		handleGetUserMusic(w, userID)
 	case "GetGameSetting":
 		writePayload(w, gameSetting(r, request))
 	case "GetUserOption":
-		writePayload(w, map[string]any{"userId": userID, "userGameOption": map[string]any{}})
-	case "GetUserItem", "GetUserCharacter", "GetUserMapArea", "GetUserCourse", "GetUserCharge", "GetUserDuel", "GetUserGacha", "GetUserActivity", "GetUserRecentRating", "GetUserMate", "GetUserRegion", "GetUserFavoriteItem", "GetUserFavoriteCollection", "GetUserCMission", "GetUserCMissionList", "GetUserLV", "GetUserUC", "GetUserCardPrintError", "GetUserLoginBonus":
-		writePayload(w, pagedResponse(endpoint, userID))
-	case "GetGameEvent", "GetGameCharge", "GetGameGacha", "GetGameRanking", "GetGameCourseLevel", "GetGameUCCondition", "GetGameLVConditionOpen", "GetGameLVConditionUnlock", "GetGameMapAreaCondition", "GetGameIdlist", "GetUserRecMusic", "GetUserRecRating", "GetUserTeam", "GetUserNetBattleData", "GetUserNetBattleRankingInfo", "GetUserRivalData", "GetUserRivalMusic", "GetUserPrintedCard", "GetUserCtoCPlay", "GetTeamCourseSetting", "GetTeamCourseRule":
+		writePayload(w, map[string]any{"userId": userID, "userGameOption": userRecord(userID, "userGameOption")})
+	case "GetUserSymbolChatSetting":
+		values := userRecords(userID, "userSymbolChatSettingList")
+		writePayload(w, map[string]any{"userId": userID, "length": len(values), "nextIndex": -1, "symbolChatInfoList": values})
+	case "GetUserItem", "CMGetUserItem", "GetUserCharacter", "CMGetUserCharacter", "GetUserMapArea", "GetUserCourse", "GetUserCharge", "GetUserDuel", "GetUserGacha", "GetUserActivity", "GetUserRecentRating", "GetUserMate", "GetUserRegion", "GetUserFavoriteItem", "GetUserFavoriteCollection", "GetUserCMission", "GetUserCMissionList", "GetUserLV", "GetUserUC", "GetUserCardPrintError", "CMGetUserCardPrintError", "GetUserLoginBonus":
+		writePayload(w, pagedResponse(endpoint, userID, request))
+	case "UpsertUserChargelog":
+		handleChargelog(w, request, userID)
+	case "CMUpsertUserGacha":
+		handleCardMakerGacha(w, request, userID)
+	case "CMUpsertUserPrint", "CMUpsertUserPrintlog", "CMUpsertUserPrintCancel", "CMUpsertUserPrintSubtract":
+		writeResponse(w, endpoint, 1, map[string]any{"returnCode": 1, "apiName": endpoint + "Api", "orderId": "0", "serialId": "FAKECARDIMAG12345678"}, "")
+	case "BeginMatching":
+		writePayload(w, beginMatching(request))
+	case "GetMatchingState":
+		writePayload(w, matchingState(request))
+	case "EndMatching":
+		writePayload(w, endMatching(request))
+	case "RemoveMatchingMember", "GameLogout", "RemoveToken", "CreateToken", "PrinterLogin", "PrinterLogout", "Ping", "UpsertClientError", "UpsertClientGameStart", "UpsertClientGameEnd":
+		writeResponse(w, endpoint, 1, nil, "")
+	case "GetGameGachaCardById":
+		writePayload(w, map[string]any{"gachaId": intValue(request["gachaId"]), "length": 0, "isPickup": false, "gameGachaCardList": []any{}, "emissionList": []any{}, "afterCalcList": []any{}})
+	case "RollGacha":
+		writePayload(w, map[string]any{"length": 0, "gameGachaCardList": []any{}})
+	case "GetGameEvent", "GetGameCharge":
+		writePayload(w, gameStaticPayload(endpoint))
+	case "GetGameGacha", "GetGameRanking", "GetGameCourseLevel", "GetGameUCCondition", "GetGameLVConditionOpen", "GetGameLVConditionUnlock", "GetGameMapAreaCondition", "GetGameIdlist", "GetUserRecMusic", "GetUserRecRating", "GetUserTeam", "GetUserNetBattleData", "GetUserNetBattleRankingInfo", "GetUserRivalData", "GetUserRivalMusic", "GetUserPrintedCard", "GetUserCtoCPlay", "GetTeamCourseSetting", "GetTeamCourseRule":
 		writePayload(w, emptyGamePayload(endpoint, userID))
-	case "GameLogin", "UpsertUserChargelog", "UpsertClientBookkeeping", "UpsertClientDevelop", "UpsertClientPlayTime", "UpsertClientSetting", "UpsertClientTestmode", "UpsertClientUpload", "UserLogout", "CMLogin", "CMLogout":
+	case "GameLogin", "UpsertClientBookkeeping", "UpsertClientDevelop", "UpsertClientPlayTime", "UpsertClientSetting", "UpsertClientTestmode", "UpsertClientUpload", "UserLogout", "CMLogin", "CMLogout":
 		writeResponse(w, endpoint, 1, nil, "")
 	default:
 		writeResponse(w, endpoint, 1, nil, "")
@@ -103,7 +160,7 @@ func handleUpsertUserAll(w http.ResponseWriter, request map[string]any, userID i
 				return err
 			}
 		}
-		return nil
+		return persistCollections(tx, userID, all)
 	}); err != nil {
 		writeResponse(w, "UpsertUserAll", 0, nil, err.Error())
 		return
@@ -163,9 +220,29 @@ func gameSetting(r *http.Request, request map[string]any) map[string]any {
 	}, "isDumpUpload": false, "isAou": false}
 }
 
-func pagedResponse(endpoint string, userID int64) map[string]any {
-	key := map[string]string{"GetUserItem": "userItemList", "GetUserCharacter": "userCharacterList", "GetUserMapArea": "userMapAreaList", "GetUserCourse": "userCourseList", "GetUserCharge": "userChargeList", "GetUserDuel": "userDuelList", "GetUserGacha": "userGachaList", "GetUserActivity": "userActivityList", "GetUserRecentRating": "userRecentRatingList", "GetUserMate": "userMateList", "GetUserRegion": "userRegionList", "GetUserFavoriteItem": "userFavoriteItemList", "GetUserFavoriteCollection": "userFavoriteCollectionList", "GetUserCMission": "userCMissionList", "GetUserCMissionList": "userCMissionList", "GetUserLV": "userLinkedVerseList", "GetUserUC": "userUnlockChallengeList", "GetUserCardPrintError": "userCardPrintErrorList", "GetUserLoginBonus": "userLoginBonusList"}[endpoint]
-	return map[string]any{"userId": userID, "length": 0, "nextIndex": -1, key: []any{}}
+func pagedResponse(endpoint string, userID int64, request map[string]any) map[string]any {
+	if endpoint == "CMGetUserItem" {
+		endpoint = "GetUserItem"
+	}
+	if endpoint == "CMGetUserCharacter" {
+		endpoint = "GetUserCharacter"
+	}
+	if endpoint == "CMGetUserCardPrintError" {
+		endpoint = "GetUserCardPrintError"
+	}
+	kind, key := userListSpec(endpoint)
+	values := userRecords(userID, kind)
+	if endpoint == "GetUserItem" || endpoint == "GetUserActivity" || endpoint == "GetUserFavoriteItem" {
+		requestedKind := intValue(request["kind"])
+		if endpoint == "GetUserItem" && requestedKind == 0 {
+			requestedKind = int(requestInt64(request, "nextIndex") / 10_000_000_000)
+		}
+		values = filterByInt(values, "itemKind", requestedKind)
+		if endpoint == "GetUserActivity" {
+			values = filterByInt(values, "kind", requestedKind)
+		}
+	}
+	return map[string]any{"userId": userID, "length": len(values), "nextIndex": -1, key: values}
 }
 
 func emptyGamePayload(endpoint string, userID int64) map[string]any {
@@ -193,6 +270,202 @@ func emptyGamePayload(endpoint string, userID int64) map[string]any {
 		"GetTeamCourseRule":           "teamCourseRuleList",
 	}[endpoint]
 	return map[string]any{"userId": userID, "length": 0, "nextIndex": -1, key: []any{}}
+}
+
+func gameStaticPayload(endpoint string) map[string]any {
+	switch endpoint {
+	case "GetGameEvent":
+		events := []model.GameEvent{}
+		database.DB.Order("id asc").Find(&events)
+		return map[string]any{"type": 1, "length": len(events), "gameEventList": events}
+	case "GetGameCharge":
+		charges := []model.GameCharge{}
+		database.DB.Order("charge_id asc").Find(&charges)
+		return map[string]any{"length": len(charges), "gameChargeList": charges}
+	default:
+		return emptyGamePayload(endpoint, 0)
+	}
+}
+
+func persistCollections(tx *gorm.DB, userID int64, all map[string]any) error {
+	for kind, raw := range all {
+		if kind == "userData" || kind == "userMusicDetailList" || kind == "userPlaylogList" {
+			continue
+		}
+		for index, value := range objectList(raw) {
+			if err := saveUserRecord(tx, userID, kind, recordKey(value, index), value); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func handleChargelog(w http.ResponseWriter, request map[string]any, userID int64) {
+	if userID == 0 {
+		writeResponse(w, "UpsertUserChargelog", 0, nil, "missing userId")
+		return
+	}
+	charge, _ := request["userCharge"].(map[string]any)
+	if charge != nil {
+		if err := saveUserRecord(database.DB, userID, "userChargeList", recordKey(charge, 0), charge); err != nil {
+			writeResponse(w, "UpsertUserChargelog", 0, nil, err.Error())
+			return
+		}
+	}
+	writeResponse(w, "UpsertUserChargelog", 1, nil, "")
+}
+
+func handleCardMakerGacha(w http.ResponseWriter, request map[string]any, userID int64) {
+	if userID == 0 {
+		writeResponse(w, "CMUpsertUserGacha", 0, nil, "missing userId")
+		return
+	}
+	payload, _ := request["cmUpsertUserGacha"].(map[string]any)
+	if payload != nil {
+		if err := persistCollections(database.DB, userID, payload); err != nil {
+			writeResponse(w, "CMUpsertUserGacha", 0, nil, err.Error())
+			return
+		}
+		for index, state := range objectList(payload["gameGachaCardList"]) {
+			if err := saveUserRecord(database.DB, userID, "userCardPrintStateList", recordKey(state, index), state); err != nil {
+				writeResponse(w, "CMUpsertUserGacha", 0, nil, err.Error())
+				return
+			}
+		}
+	}
+	writePayload(w, map[string]any{"returnCode": 1, "apiName": "CMUpsertUserGachaApi", "userCardPrintStateList": []any{}})
+}
+
+func saveUserRecord(db *gorm.DB, userID int64, kind, key string, data map[string]any) error {
+	payload, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	record := model.ChuniUserRecord{UserID: userID, Kind: kind, RecordKey: key, DataJSON: string(payload)}
+	var existing model.ChuniUserRecord
+	if err := db.Where("user_id = ? AND kind = ? AND record_key = ?", userID, kind, key).First(&existing).Error; err == nil {
+		record.ID = existing.ID
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	return db.Save(&record).Error
+}
+
+func userRecord(userID int64, kind string) map[string]any {
+	values := userRecords(userID, kind)
+	if len(values) == 0 {
+		return map[string]any{}
+	}
+	return values[0]
+}
+
+func userRecords(userID int64, kind string) []map[string]any {
+	var records []model.ChuniUserRecord
+	database.DB.Where("user_id = ? AND kind = ?", userID, kind).Order("record_key asc").Find(&records)
+	values := make([]map[string]any, 0, len(records))
+	for _, record := range records {
+		value := map[string]any{}
+		if json.Unmarshal([]byte(record.DataJSON), &value) == nil {
+			values = append(values, value)
+		}
+	}
+	return values
+}
+
+func userListSpec(endpoint string) (string, string) {
+	if endpoint == "CMGetUserItem" {
+		endpoint = "GetUserItem"
+	}
+	if endpoint == "CMGetUserCharacter" {
+		endpoint = "GetUserCharacter"
+	}
+	if endpoint == "CMGetUserCardPrintError" {
+		endpoint = "GetUserCardPrintError"
+	}
+	spec := chuniUserLists[endpoint]
+	return spec[0], spec[1]
+}
+
+func recordKey(value map[string]any, index int) string {
+	for _, field := range []string{"characterId", "itemId", "mapAreaId", "activityId", "chargeId", "courseId", "duelId", "gachaId", "unlockChallengeId", "linkedVerseId", "mateId", "regionId", "musicId", "missionId", "cardId", "id"} {
+		if raw, ok := value[field]; ok {
+			if field == "itemId" || field == "activityId" {
+				return strconv.Itoa(intValue(value["kind"])) + ":" + strconv.Itoa(intValue(raw))
+			}
+			return strconv.Itoa(intValue(raw))
+		}
+	}
+	return strconv.Itoa(index)
+}
+
+func filterByInt(values []map[string]any, key string, wanted int) []map[string]any {
+	if wanted == 0 {
+		return values
+	}
+	filtered := make([]map[string]any, 0, len(values))
+	for _, value := range values {
+		if intValue(value[key]) == wanted {
+			filtered = append(filtered, value)
+		}
+	}
+	return filtered
+}
+
+func beginMatching(request map[string]any) map[string]any {
+	member, _ := request["matchingMemberInfo"].(map[string]any)
+	if member == nil {
+		member = map[string]any{}
+	}
+	matching.Lock()
+	defer matching.Unlock()
+	for id, room := range matching.rooms {
+		if len(room.members) < 4 && time.Since(room.started) < 120*time.Second {
+			room.members = append(room.members, member)
+			return map[string]any{"roomId": id, "matchingWaitState": waitState(room)}
+		}
+	}
+	matching.nextID++
+	room := &matchingRoom{members: []map[string]any{member}, started: time.Now()}
+	matching.rooms[matching.nextID] = room
+	return map[string]any{"roomId": matching.nextID, "matchingWaitState": waitState(room)}
+}
+
+func matchingState(request map[string]any) map[string]any {
+	matching.Lock()
+	defer matching.Unlock()
+	room := matching.rooms[intValue(request["roomId"])]
+	if room == nil {
+		return map[string]any{"roomId": intValue(request["roomId"]), "matchingWaitState": waitState(nil)}
+	}
+	return map[string]any{"roomId": intValue(request["roomId"]), "matchingWaitState": waitState(room)}
+}
+
+func endMatching(request map[string]any) map[string]any {
+	matching.Lock()
+	defer matching.Unlock()
+	roomID := intValue(request["roomId"])
+	room := matching.rooms[roomID]
+	delete(matching.rooms, roomID)
+	if room == nil {
+		return map[string]any{"matchingMemberInfoList": []any{}, "matchingMemberRoleList": []any{}, "matchingResult": 0}
+	}
+	roles := make([]map[string]any, len(room.members))
+	for index := range room.members {
+		roles[index] = map[string]any{"role": index}
+	}
+	return map[string]any{"matchingMemberInfoList": room.members, "matchingMemberRoleList": roles, "matchingResult": 1}
+}
+
+func waitState(room *matchingRoom) map[string]any {
+	if room == nil {
+		return map[string]any{"matchingMemberInfoList": []any{}, "matchingMemberCount": 0, "matchingWaitTime": 0, "state": 0}
+	}
+	remaining := int(120 - time.Since(room.started).Seconds())
+	if remaining < 0 {
+		remaining = 0
+	}
+	return map[string]any{"matchingMemberInfoList": room.members, "matchingMemberCount": len(room.members), "matchingWaitTime": remaining, "state": 1}
 }
 
 func writePayload(w http.ResponseWriter, payload any) { _ = json.NewEncoder(w).Encode(payload) }

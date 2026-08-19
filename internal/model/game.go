@@ -29,6 +29,16 @@ type ChuniPlaylog struct {
 	PlaylogJSON string `gorm:"type:text"`
 }
 
+// ChuniUserRecord preserves version-specific CHUNITHM collections without
+// discarding fields that are not shared between game releases.
+type ChuniUserRecord struct {
+	gorm.Model
+	UserID    int64  `gorm:"uniqueIndex:idx_chuni_user_record;not null"`
+	Kind      string `gorm:"size:64;uniqueIndex:idx_chuni_user_record;not null"`
+	RecordKey string `gorm:"size:128;uniqueIndex:idx_chuni_user_record;not null"`
+	DataJSON  string `gorm:"type:text"`
+}
+
 // GameEvent is a globally configured maimai event returned by GetGameEventApi.
 type GameEvent struct {
 	ID          uint   `gorm:"primaryKey" json:"id"`

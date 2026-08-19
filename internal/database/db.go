@@ -63,6 +63,7 @@ func InitDB() {
 		&model.ChuniUser{},
 		&model.ChuniMusicDetail{},
 		&model.ChuniPlaylog{},
+		&model.ChuniUserRecord{},
 		&model.Terminal{},
 		&model.TerminalSession{},
 		&model.UserDetail{},
