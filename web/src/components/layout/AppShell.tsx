@@ -134,7 +134,7 @@ export function AppShell({
                 tooltip={
                   selectedCard
                     ? `${selectedCard.cardName || "未命名卡片"} · 档案 #${selectedCard.gameUserId}`
-                    : "暂无 maimai 档案"
+                    : "暂无游戏档案"
                 }
                 onClick={() => setIsProfilePickerOpen(true)}
               >
@@ -212,7 +212,7 @@ export function AppShell({
                 >
                   <p className="font-medium">{card.cardName || "未命名卡片"}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    maimai 档案 #{card.gameUserId}
+                    游戏用户 #{card.gameUserId}
                   </p>
                 </button>
               ))}

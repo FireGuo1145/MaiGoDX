@@ -74,6 +74,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		writeResponse(w, endpoint, 0, nil, "invalid JSON payload")
 		return
 	}
+	if version := pathGameVersion(r.URL.Path); version != "" {
+		// AquaDX always injects the route version into the request context. Some
+		// cabinets do not include it in the JSON body, so relying on the body
+		// incorrectly downgrades SDHD 2.50 to the old 2.00 fallback.
+		request["version"] = version
+	}
 	userID := requestInt64(request, "userId")
 
 	switch endpoint {
@@ -118,9 +124,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		writePayload(w, map[string]any{"length": 0, "gameGachaCardList": []any{}})
 	case "GetGameEvent", "GetGameCharge":
 		writePayload(w, gameStaticPayload(endpoint))
-	case "GetGameGacha", "GetGameRanking", "GetGameCourseLevel", "GetGameUCCondition", "GetGameLVConditionOpen", "GetGameLVConditionUnlock", "GetGameMapAreaCondition", "GetGameIdlist", "GetUserRecMusic", "GetUserRecRating", "GetUserNetBattleData", "GetUserNetBattleRankingInfo", "GetUserRivalData", "GetUserRivalMusic", "GetUserPrintedCard", "GetUserCtoCPlay", "GetTeamCourseSetting", "GetTeamCourseRule":
+	case "GetGameIdlist":
+		writePayload(w, map[string]any{"type": scalarString(request["type"]), "length": "0", "gameIdlistList": []any{}})
+	case "GetGameGacha", "GetGameRanking", "GetGameCourseLevel", "GetGameUCCondition", "GetGameLVConditionOpen", "GetGameLVConditionUnlock", "GetGameMapAreaCondition", "GetUserRecMusic", "GetUserRecRating", "GetUserNetBattleData", "GetUserNetBattleRankingInfo", "GetUserRivalData", "GetUserRivalMusic", "GetUserPrintedCard", "GetUserCtoCPlay", "GetTeamCourseSetting", "GetTeamCourseRule":
 		writePayload(w, emptyGamePayload(endpoint, userID))
-	case "GameLogin", "UpsertClientBookkeeping", "UpsertClientDevelop", "UpsertClientPlayTime", "UpsertClientSetting", "UpsertClientTestmode", "UpsertClientUpload", "UserLogout", "CMLogin", "CMLogout":
+	case "GameLogin":
+		writePayload(w, map[string]any{"returnCode": "1"})
+	case "UpsertClientBookkeeping", "UpsertClientDevelop", "UpsertClientPlayTime", "UpsertClientSetting", "UpsertClientTestmode", "UpsertClientUpload", "UserLogout", "CMLogin", "CMLogout":
 		writeResponse(w, endpoint, 1, nil, "")
 	default:
 		writeResponse(w, endpoint, 1, nil, "")
@@ -191,7 +201,7 @@ func handleUpsertUserAll(w http.ResponseWriter, request map[string]any, userID i
 func handleGetUserData(w http.ResponseWriter, userID int64) {
 	var profile model.ChuniUser
 	if err := database.DB.Where("user_id = ?", userID).First(&profile).Error; err != nil {
-		writePayload(w, map[string]any{"userId": userID, "userData": nil})
+		writeMissingUser(w, "GetUserData")
 		return
 	}
 	data := map[string]any{}
@@ -202,11 +212,7 @@ func handleGetUserData(w http.ResponseWriter, userID int64) {
 func handleGetUserPreview(w http.ResponseWriter, userID int64) {
 	var profile model.ChuniUser
 	if err := database.DB.Where("user_id = ?", userID).First(&profile).Error; err != nil {
-		writePayload(w, map[string]any{
-			"userId": userID, "isLogin": false, "userName": "", "playerRating": 0,
-			"level": 0, "exp": 0, "lastGameId": "", "lastRomVersion": "", "lastDataVersion": "",
-			"lastPlayDate": "", "lastLoginDate": "", "banState": 0,
-		})
+		writeMissingUser(w, "GetUserPreview")
 		return
 	}
 	data := map[string]any{}
@@ -242,30 +248,37 @@ func gameSetting(r *http.Request, request map[string]any) map[string]any {
 	if version == "" {
 		version = "2.00"
 	}
-	now := time.Now().UTC()
+	protocolVersion := version
+	if strings.Count(protocolVersion, ".") == 1 {
+		protocolVersion += ".00"
+	}
+	now := time.Now().In(time.FixedZone("JST", 9*60*60))
 	gameID := "SDHD"
 	if strings.Contains(strings.ToUpper(r.URL.Path), "/SDGS/") {
 		gameID = "SDGS"
 	}
-	base := "http://" + r.Host + "/g/" + gameID + "/" + version + "/ChuniServlet/"
-	matchingURI := chuniConfig("chuni_matching_uri", base)
+	base := "http://" + r.Host + "/g/" + gameID + "/" + version + "/"
+	matchingURI := ensureTrailingSlash(chuniConfig("chuni_matching_uri", base))
 	reflectorURI := chuniConfig("chuni_reflector_uri", "")
+	if reflectorURI != "" {
+		reflectorURI = ensureTrailingSlash(reflectorURI)
+	}
 	game := map[string]any{
-		"romVersion": version, "dataVersion": version,
-		"isMaintenance": strings.EqualFold(chuniConfig("chuni_maintenance_mode", "false"), "true"), "requestInterval": 0,
+		"romVersion": protocolVersion, "dataVersion": protocolVersion,
+		"isMaintenance": strconv.FormatBool(strings.EqualFold(chuniConfig("chuni_maintenance_mode", "false"), "true")), "requestInterval": "0",
 		"rebootStartTime": now.Add(-4 * time.Hour).Format("2006-01-02 15:04:05"), "rebootEndTime": now.Add(-3 * time.Hour).Format("2006-01-02 15:04:05"),
-		"isBackgroundDistribute": false,
-		"maxCountCharacter":      chuniConfigInt("chuni_max_count_character", 300),
-		"maxCountItem":           chuniConfigInt("chuni_max_count_item", 300),
-		"maxCountMusic":          chuniConfigInt("chuni_max_count_music", 300),
-		"matchStartTime":         now.Format("2006-01-02") + " 00:01:00", "matchEndTime": now.Format("2006-01-02") + " 23:59:00", "matchTimeLimit": 10, "matchErrorLimit": 10,
+		"isBackgroundDistribute": "false",
+		"maxCountCharacter":      strconv.Itoa(chuniConfigInt("chuni_max_count_character", 300)),
+		"maxCountItem":           strconv.Itoa(chuniConfigInt("chuni_max_count_item", 300)),
+		"maxCountMusic":          strconv.Itoa(chuniConfigInt("chuni_max_count_music", 300)),
+		"matchStartTime":         now.Format("2006-01-02") + " 00:01:00", "matchEndTime": now.Format("2006-01-02") + " 23:59:00", "matchTimeLimit": "10", "matchErrorLimit": "10",
 		"matchingUri": matchingURI, "matchingUriX": matchingURI,
 	}
 	if reflectorURI != "" {
 		game["reflectorUri"] = reflectorURI
 		game["udpHolePunchUri"] = reflectorURI
 	}
-	return map[string]any{"gameSetting": game, "isDumpUpload": false, "isAou": false}
+	return map[string]any{"gameSetting": game, "isDumpUpload": "false", "isAou": "false"}
 }
 
 func pagedResponse(endpoint string, userID int64, request map[string]any) map[string]any {
@@ -280,20 +293,30 @@ func pagedResponse(endpoint string, userID int64, request map[string]any) map[st
 	}
 	kind, key := userListSpec(endpoint)
 	values := userRecords(userID, kind)
-	if endpoint == "GetUserItem" || endpoint == "GetUserActivity" || endpoint == "GetUserFavoriteItem" {
+	response := map[string]any{"userId": userID, "length": len(values), "nextIndex": -1, key: values}
+	switch endpoint {
+	case "GetUserItem":
 		requestedKind := intValue(request["kind"])
-		if endpoint == "GetUserItem" && requestedKind == 0 {
+		if requestedKind == 0 {
 			requestedKind = int(requestInt64(request, "nextIndex") / 10_000_000_000)
 		}
 		values = filterByInt(values, "itemKind", requestedKind)
-		if endpoint == "GetUserActivity" {
-			values = filterByInt(values, "kind", requestedKind)
-		}
+		response["itemKind"] = requestedKind
+	case "GetUserActivity", "GetUserFavoriteItem":
+		requestedKind := intValue(request["kind"])
+		values = filterByInt(values, "kind", requestedKind)
+		response["kind"] = requestedKind
+	case "GetUserFavoriteCollection":
+		requestedKind := intValue(request["itemKind"])
+		values = filterByInt(values, "itemKind", requestedKind)
+		response["itemKind"] = requestedKind
 	}
 	if endpoint == "GetUserLoginBonus" && !strings.EqualFold(chuniConfig("chuni_login_bonus_enable", "false"), "true") {
 		values = nil
 	}
-	return map[string]any{"userId": userID, "length": len(values), "nextIndex": -1, key: values}
+	response["length"] = len(values)
+	response[key] = values
+	return response
 }
 
 func userMapArea(userID int64, request map[string]any) map[string]any {
@@ -554,6 +577,13 @@ func waitState(room *matchingRoom) map[string]any {
 
 func writePayload(w http.ResponseWriter, payload any) { _ = json.NewEncoder(w).Encode(payload) }
 
+func writeMissingUser(w http.ResponseWriter, endpoint string) {
+	// AquaDX returns its normal no-payload envelope when no CHUNITHM profile
+	// exists. A populated preview with blank fields makes the cabinet treat a
+	// new card as an existing player and start downloading nonexistent data.
+	writePayload(w, map[string]any{"returnCode": "1", "apiName": endpoint + "Api"})
+}
+
 func writeResponse(w http.ResponseWriter, endpoint string, returnCode int, data any, message string) {
 	if data != nil && returnCode == 1 {
 		writePayload(w, data)
@@ -565,6 +595,20 @@ func writeResponse(w http.ResponseWriter, endpoint string, returnCode int, data 
 func pathTail(path string) string {
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	return parts[len(parts)-1]
+}
+
+func pathGameVersion(path string) string {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	for index, part := range parts {
+		if (strings.EqualFold(part, "SDHD") || strings.EqualFold(part, "SDGS")) && index+1 < len(parts) {
+			return strings.TrimSpace(parts[index+1])
+		}
+	}
+	return ""
+}
+
+func ensureTrailingSlash(value string) string {
+	return strings.TrimRight(value, "/") + "/"
 }
 
 func requestInt64(request map[string]any, key string) int64 {
@@ -602,6 +646,23 @@ func intValue(value any) int {
 func stringValue(value any) string {
 	stringValue, _ := value.(string)
 	return stringValue
+}
+
+func scalarString(value any) string {
+	switch value := value.(type) {
+	case string:
+		return value
+	case float64:
+		return strconv.FormatFloat(value, 'f', -1, 64)
+	case json.Number:
+		return value.String()
+	case int:
+		return strconv.Itoa(value)
+	case int64:
+		return strconv.FormatInt(value, 10)
+	default:
+		return ""
+	}
 }
 
 func firstObject(value any) map[string]any {

@@ -19,12 +19,8 @@ func HandleGetChuniStats(w http.ResponseWriter, r *http.Request) {
 		writePortalUpdateError(w, http.StatusBadRequest, "档案卡片参数无效")
 		return
 	}
-	var card model.UserCard
-	query := database.DB.Where("user_id = ?", account.ID).Order("id asc").Limit(1)
-	if cardID != 0 {
-		query = database.DB.Where("id = ? AND user_id = ?", cardID, account.ID).Limit(1)
-	}
-	if result := query.Find(&card); result.Error != nil || result.RowsAffected == 0 {
+	card, found, err := chuniPortalCard(account.ID, cardID)
+	if err != nil || !found {
 		writeChuniStats(w, map[string]any{"success": true, "message": "当前账户尚未绑定 Aime 卡", "recentPlays": []any{}, "musicDetails": []any{}})
 		return
 	}
@@ -41,6 +37,28 @@ func HandleGetChuniStats(w http.ResponseWriter, r *http.Request) {
 		"success": true, "selectedCardId": card.ID, "userId": card.GameUserID,
 		"profile": decodeChuniJSON(profile.ProfileJSON), "recentPlays": decodeChuniRows(plays), "musicDetails": decodeChuniDetails(details),
 	})
+}
+
+func chuniPortalCard(accountID uint, cardID uint) (model.UserCard, bool, error) {
+	var card model.UserCard
+	if cardID != 0 {
+		result := database.DB.Where("id = ? AND user_id = ?", cardID, accountID).Limit(1).Find(&card)
+		return card, result.RowsAffected > 0, result.Error
+	}
+
+	// Prefer a card with a persisted CHUNITHM profile. An account may contain
+	// older bound cards whose game_user_id is still zero.
+	result := database.DB.Model(&model.UserCard{}).
+		Select("user_cards.*").
+		Joins("JOIN chuni_users ON chuni_users.user_id = user_cards.game_user_id AND chuni_users.deleted_at IS NULL").
+		Where("user_cards.user_id = ?", accountID).
+		Order("user_cards.id asc").Limit(1).Find(&card)
+	if result.Error != nil || result.RowsAffected > 0 {
+		return card, result.RowsAffected > 0, result.Error
+	}
+
+	result = database.DB.Where("user_id = ?", accountID).Order("id asc").Limit(1).Find(&card)
+	return card, result.RowsAffected > 0, result.Error
 }
 
 func writeChuniStats(w http.ResponseWriter, value map[string]any) {

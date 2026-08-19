@@ -73,6 +73,36 @@ func TestGetUserDataAndMusicReturnPersistedPayloads(t *testing.T) {
 	}
 }
 
+func TestMissingUserPreviewAndDataSignalNoProfile(t *testing.T) {
+	setupTestDB(t)
+	for _, endpoint := range []string{"GetUserPreviewApi", "GetUserDataApi"} {
+		response := httptest.NewRecorder()
+		Handler(response, httptest.NewRequest(http.MethodPost, "/g/SDHD/2.50/ChuniServlet/"+endpoint, bytes.NewBufferString(`{"userId":3}`)))
+		var payload map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode %s: %v", endpoint, err)
+		}
+		if payload["returnCode"] != "1" || payload["apiName"] != endpoint {
+			t.Fatalf("%s payload=%v", endpoint, payload)
+		}
+		if _, exists := payload["userId"]; exists {
+			t.Fatalf("%s must not fabricate an existing user: %v", endpoint, payload)
+		}
+	}
+}
+
+func TestGameLoginUsesChunithmEnvelope(t *testing.T) {
+	response := httptest.NewRecorder()
+	Handler(response, httptest.NewRequest(http.MethodPost, "/g/SDHD/2.50/ChuniServlet/GameLoginApi", bytes.NewBufferString(`{"userId":3}`)))
+	var payload map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload["returnCode"] != "1" || len(payload) != 1 {
+		t.Fatalf("payload=%v", payload)
+	}
+}
+
 func TestGameSettingReturnsChuniServletAddress(t *testing.T) {
 	setupTestDB(t)
 	response := httptest.NewRecorder()
@@ -96,7 +126,24 @@ func TestGameSettingKeepsSDGSAddress(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	setting := payload["gameSetting"].(map[string]any)
-	if setting["matchingUri"] != "http://example.com/g/SDGS/2.00/ChuniServlet/" {
+	if setting["matchingUri"] != "http://example.com/g/SDGS/2.00/" {
+		t.Fatalf("matchingUri=%v", setting["matchingUri"])
+	}
+}
+
+func TestGameSettingUsesVersionFromRoute(t *testing.T) {
+	setupTestDB(t)
+	response := httptest.NewRecorder()
+	Handler(response, httptest.NewRequest(http.MethodPost, "/g/SDHD/2.50/ChuniServlet/GetGameSettingApi", bytes.NewBufferString(`{}`)))
+	var payload map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	setting := payload["gameSetting"].(map[string]any)
+	if setting["romVersion"] != "2.50.00" || setting["dataVersion"] != "2.50.00" {
+		t.Fatalf("versions=%v/%v", setting["romVersion"], setting["dataVersion"])
+	}
+	if setting["matchingUri"] != "http://example.com/g/SDHD/2.50/" {
 		t.Fatalf("matchingUri=%v", setting["matchingUri"])
 	}
 }
@@ -126,8 +173,8 @@ func TestGameSettingUsesChuniConfig(t *testing.T) {
 	setupTestDB(t)
 	configs := []model.SystemConfig{
 		{Key: "chuni_maintenance_mode", Value: "true"},
-		{Key: "chuni_matching_uri", Value: "https://matching.example/"},
-		{Key: "chuni_reflector_uri", Value: "https://reflector.example/"},
+		{Key: "chuni_matching_uri", Value: "https://matching.example"},
+		{Key: "chuni_reflector_uri", Value: "https://reflector.example"},
 		{Key: "chuni_max_count_music", Value: "480"},
 	}
 	if err := database.DB.Create(&configs).Error; err != nil {
@@ -141,8 +188,23 @@ func TestGameSettingUsesChuniConfig(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	setting := payload["gameSetting"].(map[string]any)
-	if setting["isMaintenance"] != true || setting["matchingUri"] != "https://matching.example/" || setting["matchingUriX"] != "https://matching.example/" || setting["reflectorUri"] != "https://reflector.example/" || setting["maxCountMusic"] != float64(480) {
+	if setting["isMaintenance"] != "true" || setting["matchingUri"] != "https://matching.example/" || setting["matchingUriX"] != "https://matching.example/" || setting["reflectorUri"] != "https://reflector.example/" || setting["maxCountMusic"] != "480" {
 		t.Fatalf("unexpected game setting: %v", setting)
+	}
+}
+
+func TestGameIDListEchoesTypeAsString(t *testing.T) {
+	response := httptest.NewRecorder()
+	Handler(response, httptest.NewRequest(http.MethodPost, "/g/SDHD/2.50/ChuniServlet/GetGameIdlistApi", bytes.NewBufferString(`{"type":3}`)))
+	var payload map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload["type"] != "3" || payload["length"] != "0" {
+		t.Fatalf("payload=%v", payload)
+	}
+	if _, ok := payload["gameIdlistList"].([]any); !ok {
+		t.Fatalf("gameIdlistList=%T, want []any", payload["gameIdlistList"])
 	}
 }
 
@@ -188,10 +250,13 @@ func TestUpsertUserAllRoundTripsGenericCollections(t *testing.T) {
 	}
 
 	itemsResponse := httptest.NewRecorder()
-	Handler(itemsResponse, httptest.NewRequest(http.MethodPost, "/g/SDHD/2.00/ChuniServlet/GetUserItemApi", bytes.NewBufferString(`{"userId":102,"kind":5}`)))
+	Handler(itemsResponse, httptest.NewRequest(http.MethodPost, "/g/SDHD/2.00/ChuniServlet/GetUserItemApi", bytes.NewBufferString(`{"userId":102,"nextIndex":50000000000,"maxCount":100}`)))
 	var items map[string]any
 	if err := json.NewDecoder(itemsResponse.Body).Decode(&items); err != nil {
 		t.Fatalf("decode items: %v", err)
+	}
+	if items["itemKind"] != float64(5) || items["nextIndex"] != float64(-1) {
+		t.Fatalf("item paging=%v", items)
 	}
 	values := items["userItemList"].([]any)
 	if len(values) != 1 || values[0].(map[string]any)["itemId"] != float64(8000) {

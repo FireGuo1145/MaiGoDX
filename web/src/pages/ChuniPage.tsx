@@ -1,57 +1,205 @@
-import { Activity, Music2, UserRound } from "lucide-react"
+import { Activity, Gauge, Music2, UserRound } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import type { ChuniStats } from "@/types"
+
+type ChuniRecord = Record<string, unknown>
 
 export function ChuniPage({ stats }: { stats: ChuniStats | null }) {
   const profile = stats?.profile || {}
   const plays = stats?.recentPlays || []
   const details = stats?.musicDetails || []
-  const value = (source: Record<string, unknown>, key: string) => source[key] as string | number | undefined
 
   return (
     <div className="space-y-6">
-      {stats?.message && <p className="rounded-md border border-border bg-card p-4 text-sm text-muted-foreground">{stats.message}</p>}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <SummaryCard icon={<UserRound />} label="玩家名称" value={value(profile, "userName") || "—"} />
-        <SummaryCard icon={<Activity />} label="当前 Rating" value={value(profile, "playerRating")?.toLocaleString() || "—"} />
-        <SummaryCard icon={<Music2 />} label="已保存成绩" value={details.length.toLocaleString()} />
+      {stats?.message && (
+        <p className="rounded-md border border-border bg-card p-4 text-sm text-muted-foreground">
+          {stats.message}
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard
+          icon={<UserRound />}
+          label="玩家名称"
+          value={displayValue(profile, "userName")}
+        />
+        <SummaryCard
+          icon={<Gauge />}
+          label="等级（level）"
+          value={displayNumber(profile, "level")}
+        />
+        <SummaryCard
+          icon={<Activity />}
+          label="玩家评分（playerRating）"
+          value={displayNumber(profile, "playerRating")}
+        />
+        <SummaryCard
+          icon={<Music2 />}
+          label="游玩次数（playCount）"
+          value={displayNumber(profile, "playCount")}
+        />
       </div>
 
+      {stats?.profile && (
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <CardTitle>档案数据</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+            <ProfileField
+              label="经验值"
+              field="exp"
+              value={displayNumber(profile, "exp")}
+            />
+            <ProfileField
+              label="最高评分"
+              field="highestRating"
+              value={displayNumber(profile, "highestRating")}
+            />
+            <ProfileField
+              label="OVER POWER"
+              field="overPowerPoint"
+              value={displayNumber(profile, "overPowerPoint")}
+            />
+            <ProfileField
+              label="OVER POWER 比率"
+              field="overPowerRate"
+              value={displayNumber(profile, "overPowerRate")}
+            />
+            <ProfileField
+              label="持有点数"
+              field="point"
+              value={displayNumber(profile, "point")}
+            />
+            <ProfileField
+              label="最后游玩"
+              field="lastPlayDate"
+              value={displayValue(profile, "lastPlayDate")}
+            />
+            <ProfileField
+              label="ROM 版本"
+              field="lastRomVersion"
+              value={displayValue(profile, "lastRomVersion")}
+            />
+            <ProfileField
+              label="数据版本"
+              field="lastDataVersion"
+              value={displayValue(profile, "lastDataVersion")}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="overflow-hidden border-border bg-card">
-        <CardHeader><CardTitle>最近游玩</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>最近游玩</CardTitle>
+        </CardHeader>
         <CardContent className="p-0">
           <Table>
-            <TableHeader><TableHead isRowHeader>乐曲</TableHead><TableHead>难度</TableHead><TableHead>分数</TableHead><TableHead>游玩日期</TableHead></TableHeader>
+            <TableHeader>
+              <TableHead isRowHeader>乐曲 ID</TableHead>
+              <TableHead>难度 ID</TableHead>
+              <TableHead>分数</TableHead>
+              <TableHead>Rank</TableHead>
+              <TableHead>结果</TableHead>
+              <TableHead>游玩时评分</TableHead>
+              <TableHead>游玩时间</TableHead>
+            </TableHeader>
             <TableBody>
-              {plays.length ? plays.map((play, index) => (
-                <TableRow key={`${value(play, "musicId")}-${index}`}>
-                  <TableCell className="font-mono">{value(play, "musicId") ?? "—"}</TableCell>
-                  <TableCell><Badge variant="outline">LV.{value(play, "level") ?? "—"}</Badge></TableCell>
-                  <TableCell className="font-mono">{value(play, "score")?.toLocaleString() ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{value(play, "playDate") || value(play, "userPlayDate") || "—"}</TableCell>
-                </TableRow>
-              )) : <TableRow><TableCell className="py-10 text-center text-muted-foreground">暂无 CHUNITHM 游玩记录。</TableCell><TableCell /><TableCell /><TableCell /></TableRow>}
+              {plays.length ? (
+                plays.map((play, index) => (
+                  <TableRow
+                    key={`${rawValue(play, "musicId")}-${rawValue(play, "userPlayDate")}-${index}`}
+                  >
+                    <TableCell className="font-mono">
+                      {displayValue(play, "musicId")}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {displayValue(play, "level")}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {displayNumber(play, "score")}
+                    </TableCell>
+                    <TableCell>{displayValue(play, "rank")}</TableCell>
+                    <TableCell>
+                      {isTruthy(rawValue(play, "isClear")) ? "CLEAR" : "未通关"}
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {displayNumber(play, "playerRating")}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {displayValue(play, "userPlayDate")}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <EmptyRow columns={7} text="暂无 CHUNITHM 游玩记录。" />
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
       <Card className="overflow-hidden border-border bg-card">
-        <CardHeader><CardTitle>成绩明细</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>成绩明细</CardTitle>
+        </CardHeader>
         <CardContent className="p-0">
           <Table>
-            <TableHeader><TableHead isRowHeader>乐曲</TableHead><TableHead>难度</TableHead><TableHead>分数</TableHead><TableHead>达成状态</TableHead></TableHeader>
+            <TableHeader>
+              <TableHead isRowHeader>乐曲 ID</TableHead>
+              <TableHead>难度 ID</TableHead>
+              <TableHead>最高分</TableHead>
+              <TableHead>Score Rank</TableHead>
+              <TableHead>游玩次数</TableHead>
+              <TableHead>最大连击</TableHead>
+              <TableHead>MISS</TableHead>
+              <TableHead>达成状态</TableHead>
+            </TableHeader>
             <TableBody>
-              {details.length ? details.map((detail, index) => (
-                <TableRow key={`${value(detail, "musicId")}-${value(detail, "level")}-${index}`}>
-                  <TableCell className="font-mono">{value(detail, "musicId") ?? "—"}</TableCell>
-                  <TableCell><Badge variant="outline">LV.{value(detail, "level") ?? "—"}</Badge></TableCell>
-                  <TableCell className="font-mono">{value(detail, "score")?.toLocaleString() ?? "—"}</TableCell>
-                  <TableCell>{value(detail, "isSuccess") === true ? "已通关" : "—"}</TableCell>
-                </TableRow>
-              )) : <TableRow><TableCell className="py-10 text-center text-muted-foreground">暂无 CHUNITHM 成绩明细。</TableCell><TableCell /><TableCell /><TableCell /></TableRow>}
+              {details.length ? (
+                details.map((detail, index) => (
+                  <TableRow
+                    key={`${rawValue(detail, "musicId")}-${rawValue(detail, "level")}-${index}`}
+                  >
+                    <TableCell className="font-mono">
+                      {displayValue(detail, "musicId")}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {displayValue(detail, "level")}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {displayNumber(detail, "scoreMax")}
+                    </TableCell>
+                    <TableCell>{displayValue(detail, "scoreRank")}</TableCell>
+                    <TableCell>{displayNumber(detail, "playCount")}</TableCell>
+                    <TableCell>
+                      {displayNumber(detail, "maxComboCount")}
+                    </TableCell>
+                    <TableCell>{displayNumber(detail, "missCount")}</TableCell>
+                    <TableCell>
+                      {isTruthy(rawValue(detail, "isSuccess"))
+                        ? "已达成"
+                        : "未达成"}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <EmptyRow columns={8} text="暂无 CHUNITHM 成绩明细。" />
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -60,6 +208,85 @@ export function ChuniPage({ stats }: { stats: ChuniStats | null }) {
   )
 }
 
-function SummaryCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return <Card><CardContent className="p-5"><div className="flex items-center gap-2 text-sm text-muted-foreground"><span className="text-neutral-400">{icon}</span>{label}</div><p className="mt-3 text-2xl font-black">{value}</p></CardContent></Card>
+function rawValue(source: ChuniRecord, key: string) {
+  return source[key]
+}
+
+function displayValue(source: ChuniRecord, key: string) {
+  const value = rawValue(source, key)
+  return value === undefined || value === null || value === ""
+    ? "—"
+    : String(value)
+}
+
+function displayNumber(source: ChuniRecord, key: string) {
+  const value = rawValue(source, key)
+  if (typeof value === "number") return value.toLocaleString()
+  if (typeof value !== "string" || !/^-?\d+$/.test(value))
+    return displayValue(source, key)
+  try {
+    return BigInt(value).toLocaleString()
+  } catch {
+    return value
+  }
+}
+
+function isTruthy(value: unknown) {
+  return value === true || value === 1 || value === "1" || value === "true"
+}
+
+function SummaryCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+}) {
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="text-neutral-400">{icon}</span>
+          {label}
+        </div>
+        <p className="mt-3 text-2xl font-black">{value}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ProfileField({
+  label,
+  field,
+  value,
+}: {
+  label: string
+  field: string
+  value: string
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs text-muted-foreground">
+        {label} · {field}
+      </p>
+      <p className="mt-1 truncate font-mono text-sm font-medium" title={value}>
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function EmptyRow({ columns, text }: { columns: number; text: string }) {
+  return (
+    <TableRow>
+      <TableCell className="py-10 text-center text-muted-foreground">
+        {text}
+      </TableCell>
+      {Array.from({ length: columns - 1 }, (_, index) => (
+        <TableCell key={index} />
+      ))}
+    </TableRow>
+  )
 }
