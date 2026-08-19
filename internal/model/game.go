@@ -1,5 +1,34 @@
 package model
 
+import "gorm.io/gorm"
+
+// ChuniUser stores the latest CHUNITHM profile payload for an Aime user.
+// The game carries version-specific fields, so the complete payload is kept
+// alongside the fields needed for preview responses.
+type ChuniUser struct {
+	gorm.Model
+	UserID       int64  `gorm:"uniqueIndex;not null"`
+	UserName     string `gorm:"size:80"`
+	PlayerRating int
+	ProfileJSON  string `gorm:"type:text"`
+}
+
+type ChuniMusicDetail struct {
+	gorm.Model
+	UserID     int64  `gorm:"index:idx_chuni_music;not null"`
+	MusicID    int    `gorm:"index:idx_chuni_music;not null"`
+	Level      int    `gorm:"index:idx_chuni_music;not null"`
+	DetailJSON string `gorm:"type:text"`
+}
+
+type ChuniPlaylog struct {
+	gorm.Model
+	UserID      int64 `gorm:"index;not null"`
+	MusicID     int   `gorm:"index"`
+	Level       int
+	PlaylogJSON string `gorm:"type:text"`
+}
+
 // GameEvent is a globally configured maimai event returned by GetGameEventApi.
 type GameEvent struct {
 	ID          uint   `gorm:"primaryKey" json:"id"`

@@ -75,7 +75,9 @@ func main() {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		if strings.HasPrefix(path, "/g/") || strings.HasPrefix(path, "/api/") {
-			if strings.HasPrefix(path, "/g/") {
+			if strings.HasPrefix(path, "/g/SDHD/") || strings.HasPrefix(path, "/g/SDGS/") {
+				handler.ChuniHandler(w, r)
+			} else if strings.HasPrefix(path, "/g/") {
 				handler.MaimaiHandler(w, r)
 			}
 			return

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
+	"github.com/FireGuo1145/MaiGoDX/internal/handler/chunithm"
 	"github.com/FireGuo1145/MaiGoDX/internal/handler/maimai"
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
 )
@@ -166,7 +167,12 @@ func HandleTerminalMaimai(w http.ResponseWriter, r *http.Request) {
 	// controller's canonical /g/... route before dispatching the game API.
 	r.URL.Path = "/g/" + strings.Join(parts[2:], "/")
 	r.URL.RawPath = ""
-	maimai.MaimaiHandler(w, r)
+	switch strings.ToUpper(session.GameID) {
+	case "SDHD", "SDGS":
+		chunithm.Handler(w, r)
+	default:
+		maimai.MaimaiHandler(w, r)
+	}
 }
 
 func allNetKeychipProtectionEnabled() bool {
