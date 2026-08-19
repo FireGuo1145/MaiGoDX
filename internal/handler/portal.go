@@ -49,8 +49,17 @@ type portalRegion struct {
 
 type portalProfileUpdateRequest struct {
 	CardID          uint                   `json:"cardId"`
-	PartnerID       int                    `json:"partnerId"`
-	Maimile         int64                  `json:"maimile"`
+	PartnerID       *int                   `json:"partnerId"`
+	Point           *int64                 `json:"point"`
+	TotalPoint      *int64                 `json:"totalPoint"`
+	LegacyMaimile   *int64                 `json:"maimile"`
+	IconID          *int                   `json:"iconId"`
+	PlateID         *int                   `json:"plateId"`
+	TitleID         *int                   `json:"titleId"`
+	FrameID         *int                   `json:"frameId"`
+	SelectMapID     *int                   `json:"selectMapId"`
+	MapStock        *int                   `json:"mapStock"`
+	RenameCredit    *int                   `json:"renameCredit"`
 	TravelPartners  []portalTravelPartner  `json:"travelPartners"`
 	FunctionTickets []portalFunctionTicket `json:"functionTickets"`
 	Regions         []portalRegion         `json:"regions"`
@@ -197,16 +206,29 @@ func portalCardIDFromRequest(r *http.Request) (uint, error) {
 
 func portalProfileForAccount(accountID, cardID uint) (model.UserCard, model.UserDetail, error) {
 	var card model.UserCard
-	query := database.DB.Where("user_id = ? AND game_user_id > 0", accountID).Order("id asc").Limit(1)
 	if cardID != 0 {
-		query = database.DB.Where("id = ? AND user_id = ? AND game_user_id > 0", cardID, accountID).Limit(1)
-	}
-	lookup := query.Find(&card)
-	if lookup.Error != nil || lookup.RowsAffected == 0 {
-		return model.UserCard{}, model.UserDetail{}, errors.New("当前账户尚未关联所选 maimai 游戏档案")
+		lookup := database.DB.Where("id = ? AND user_id = ? AND game_user_id > 0", cardID, accountID).Limit(1).Find(&card)
+		if lookup.Error != nil || lookup.RowsAffected == 0 {
+			return model.UserCard{}, model.UserDetail{}, errors.New("当前账户尚未关联所选 maimai 游戏档案")
+		}
+	} else {
+		lookup := database.DB.Model(&model.UserCard{}).
+			Select("user_cards.*").
+			Joins("JOIN user_details ON user_details.user_id = user_cards.game_user_id AND user_details.deleted_at IS NULL").
+			Where("user_cards.user_id = ? AND user_cards.game_user_id > 0", accountID).
+			Order("user_cards.id asc").Limit(1).Find(&card)
+		if lookup.Error != nil {
+			return model.UserCard{}, model.UserDetail{}, lookup.Error
+		}
+		if lookup.RowsAffected == 0 {
+			lookup = database.DB.Where("user_id = ? AND game_user_id > 0", accountID).Order("id asc").Limit(1).Find(&card)
+			if lookup.Error != nil || lookup.RowsAffected == 0 {
+				return model.UserCard{}, model.UserDetail{}, errors.New("当前账户尚未关联所选 maimai 游戏档案")
+			}
+		}
 	}
 	var detail model.UserDetail
-	lookup = database.DB.Where("user_id = ?", card.GameUserID).Limit(1).Find(&detail)
+	lookup := database.DB.Where("user_id = ?", card.GameUserID).Limit(1).Find(&detail)
 	if lookup.Error != nil || lookup.RowsAffected == 0 {
 		return model.UserCard{}, model.UserDetail{}, errors.New("所选卡片尚未创建 maimai 游戏档案")
 	}
@@ -219,39 +241,91 @@ func portalDetailForAccount(accountID, cardID uint) (model.UserDetail, error) {
 }
 
 func savePortalProfile(detail model.UserDetail, request portalProfileUpdateRequest) error {
-	if request.PartnerID < 0 || request.Maimile < 0 || !validPortalProfileCollections(request) {
+	if !validPortalProfileFields(request) || !validPortalProfileCollections(request) {
 		return errors.New("档案数据包含无效的负数或重复 ID")
 	}
 	return database.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&model.UserDetail{}).Where("user_id = ?", detail.UserID).Updates(map[string]interface{}{"partner_id": request.PartnerID, "total_point": request.Maimile}).Error; err != nil {
-			return err
-		}
-		if err := tx.Unscoped().Where("user_id = ?", detail.UserID).Delete(&model.UserIntimate{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Unscoped().Where("user_id = ? AND item_kind = ?", detail.UserID, 12).Delete(&model.UserItem{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Unscoped().Where("user_id = ?", detail.UserID).Delete(&model.UserRegion{}).Error; err != nil {
-			return err
-		}
-		for _, value := range request.TravelPartners {
-			if err := tx.Create(&model.UserIntimate{UserID: detail.UserID, PartnerID: value.PartnerID, IntimateLevel: value.IntimateLevel, IntimateCountRewarded: value.IntimateCountRewarded}).Error; err != nil {
+		updates := portalProfileUpdates(request)
+		if len(updates) > 0 {
+			if err := tx.Model(&model.UserDetail{}).Where("user_id = ?", detail.UserID).Updates(updates).Error; err != nil {
 				return err
 			}
 		}
-		for _, value := range request.FunctionTickets {
-			if err := tx.Create(&model.UserItem{UserID: detail.UserID, ItemKind: 12, ItemID: value.ItemID, Stock: value.Stock, IsValid: true}).Error; err != nil {
+		if request.TravelPartners != nil {
+			if err := tx.Unscoped().Where("user_id = ?", detail.UserID).Delete(&model.UserIntimate{}).Error; err != nil {
 				return err
 			}
+			for _, value := range request.TravelPartners {
+				if err := tx.Create(&model.UserIntimate{UserID: detail.UserID, PartnerID: value.PartnerID, IntimateLevel: value.IntimateLevel, IntimateCountRewarded: value.IntimateCountRewarded}).Error; err != nil {
+					return err
+				}
+			}
 		}
-		for _, value := range request.Regions {
-			if err := tx.Create(&model.UserRegion{UserID: detail.UserID, RegionID: value.RegionID, PlayCount: value.PlayCount}).Error; err != nil {
+		if request.FunctionTickets != nil {
+			if err := tx.Unscoped().Where("user_id = ? AND item_kind = ?", detail.UserID, 12).Delete(&model.UserItem{}).Error; err != nil {
 				return err
+			}
+			for _, value := range request.FunctionTickets {
+				if err := tx.Create(&model.UserItem{UserID: detail.UserID, ItemKind: 12, ItemID: value.ItemID, Stock: value.Stock, IsValid: true}).Error; err != nil {
+					return err
+				}
+			}
+		}
+		if request.Regions != nil {
+			if err := tx.Unscoped().Where("user_id = ?", detail.UserID).Delete(&model.UserRegion{}).Error; err != nil {
+				return err
+			}
+			for _, value := range request.Regions {
+				if err := tx.Create(&model.UserRegion{UserID: detail.UserID, RegionID: value.RegionID, PlayCount: value.PlayCount}).Error; err != nil {
+					return err
+				}
 			}
 		}
 		return nil
 	})
+}
+
+func validPortalProfileFields(request portalProfileUpdateRequest) bool {
+	values := []*int{request.PartnerID, request.IconID, request.PlateID, request.TitleID, request.FrameID, request.SelectMapID, request.MapStock, request.RenameCredit}
+	for _, value := range values {
+		if value != nil && (*value < 0 || int64(*value) > 2_147_483_647) {
+			return false
+		}
+	}
+	for _, value := range []*int64{request.Point, request.TotalPoint, request.LegacyMaimile} {
+		if value != nil && (*value < 0 || *value > 2_147_483_647) {
+			return false
+		}
+	}
+	return true
+}
+
+func portalProfileUpdates(request portalProfileUpdateRequest) map[string]interface{} {
+	updates := map[string]interface{}{}
+	fields := []struct {
+		column string
+		value  *int
+	}{
+		{"partner_id", request.PartnerID}, {"icon_id", request.IconID}, {"plate_id", request.PlateID},
+		{"title_id", request.TitleID}, {"frame_id", request.FrameID}, {"select_map_id", request.SelectMapID},
+		{"map_stock", request.MapStock}, {"rename_credit", request.RenameCredit},
+	}
+	for _, field := range fields {
+		if field.value != nil {
+			updates[field.column] = *field.value
+		}
+	}
+	point := request.Point
+	if point == nil {
+		point = request.LegacyMaimile
+	}
+	if point != nil {
+		updates["point"] = *point
+	}
+	if request.TotalPoint != nil {
+		updates["total_point"] = *request.TotalPoint
+	}
+	return updates
 }
 
 func adjustPortalFunctionTicket(userID int64, itemID, amount int) error {

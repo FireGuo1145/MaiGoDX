@@ -39,8 +39,8 @@ export function HomePage({ stats }: HomePageProps) {
           />
           <ProfileStat
             icon={<CircleUserRound />}
-            label="maimile"
-            value={profile?.totalPoint}
+            label="当前 maimile"
+            value={profile?.point}
           />
         </CardContent>
       </Card>

@@ -44,7 +44,15 @@ export function MaimaiPage({
     metadata[kind]?.find((item) => item.id === id)?.name || `ID ${id}`
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [partnerID, setPartnerID] = useState("0")
-  const [maimile, setMaimile] = useState("0")
+  const [point, setPoint] = useState("0")
+  const [totalPoint, setTotalPoint] = useState("0")
+  const [iconID, setIconID] = useState("0")
+  const [plateID, setPlateID] = useState("0")
+  const [titleID, setTitleID] = useState("0")
+  const [frameID, setFrameID] = useState("0")
+  const [selectMapID, setSelectMapID] = useState("0")
+  const [mapStock, setMapStock] = useState("0")
+  const [renameCredit, setRenameCredit] = useState("0")
   const [travelPartnerText, setTravelPartnerText] = useState("")
   const [ticketText, setTicketText] = useState("")
   const [regionText, setRegionText] = useState("")
@@ -57,7 +65,15 @@ export function MaimaiPage({
 
   const startProfileEdit = () => {
     setPartnerID(String(stats?.partner?.partnerId || 0))
-    setMaimile(String(stats?.user?.totalPoint || 0))
+    setPoint(String(stats?.user?.point || 0))
+    setTotalPoint(String(stats?.user?.totalPoint || 0))
+    setIconID(String(stats?.user?.iconId || 0))
+    setPlateID(String(stats?.user?.plateId || 0))
+    setTitleID(String(stats?.user?.titleId || 0))
+    setFrameID(String(stats?.user?.frameId || 0))
+    setSelectMapID(String(stats?.user?.selectMapId || 0))
+    setMapStock(String(stats?.user?.mapStock || 0))
+    setRenameCredit(String(stats?.user?.renameCredit || 0))
     setTravelPartnerText(
       travelPartners
         .map(
@@ -87,7 +103,15 @@ export function MaimaiPage({
       await api.updateProfile({
         cardId: selectedCardID,
         partnerId: parseInteger(partnerID, "搭档 ID"),
-        maimile: parseInteger(maimile, "maimile 数量"),
+        point: parseInteger(point, "当前 maimile"),
+        totalPoint: parseInteger(totalPoint, "累计 maimile"),
+        iconId: parseInteger(iconID, "图标 ID"),
+        plateId: parseInteger(plateID, "名牌 ID"),
+        titleId: parseInteger(titleID, "称号 ID"),
+        frameId: parseInteger(frameID, "边框 ID"),
+        selectMapId: parseInteger(selectMapID, "当前地图 ID"),
+        mapStock: parseInteger(mapStock, "地图库存"),
+        renameCredit: parseInteger(renameCredit, "改名次数"),
         travelPartners: parseTravelPartners(travelPartnerText),
         functionTickets: parseFunctionTickets(ticketText),
         regions: parseRegions(regionText),
@@ -239,31 +263,67 @@ export function MaimaiPage({
           </div>
           {isEditingProfile ? (
             <Card className="space-y-4 border-neutral-500/40 bg-card p-5">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                  当前搭档：{metadataName("partner", Number(partnerID))}（ID{" "}
-                  {partnerID || "0"}）
-                </label>
-                <Input
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <ProfileNumberInput
+                  label={`当前搭档 · ${metadataName("partner", Number(partnerID))}`}
+                  field="partnerId"
                   value={partnerID}
-                  onChange={(event) => setPartnerID(event.target.value)}
-                  inputMode="numeric"
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground outline-none focus:border-neutral-500"
+                  onChange={setPartnerID}
                 />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                  maimile 数量
-                </label>
-                <Input
-                  value={maimile}
-                  onChange={(event) => setMaimile(event.target.value)}
-                  inputMode="numeric"
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground outline-none focus:border-neutral-500"
+                <ProfileNumberInput
+                  label="当前 maimile"
+                  field="point"
+                  value={point}
+                  onChange={setPoint}
                 />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  对应游戏档案的 maimile（totalPoint），保存后在机台同步。
-                </p>
+                <ProfileNumberInput
+                  label="累计 maimile"
+                  field="totalPoint"
+                  value={totalPoint}
+                  onChange={setTotalPoint}
+                />
+                <ProfileNumberInput
+                  label="图标"
+                  field="iconId"
+                  value={iconID}
+                  onChange={setIconID}
+                />
+                <ProfileNumberInput
+                  label="名牌"
+                  field="plateId"
+                  value={plateID}
+                  onChange={setPlateID}
+                />
+                <ProfileNumberInput
+                  label="称号"
+                  field="titleId"
+                  value={titleID}
+                  onChange={setTitleID}
+                />
+                <ProfileNumberInput
+                  label="边框"
+                  field="frameId"
+                  value={frameID}
+                  onChange={setFrameID}
+                />
+                <ProfileNumberInput
+                  label="当前地图"
+                  field="selectMapId"
+                  value={selectMapID}
+                  onChange={setSelectMapID}
+                />
+                <ProfileNumberInput
+                  label="地图库存"
+                  field="mapStock"
+                  value={mapStock}
+                  onChange={setMapStock}
+                />
+                <ProfileNumberInput
+                  label="可改名次数"
+                  field="renameCredit"
+                  value={renameCredit}
+                  onChange={setRenameCredit}
+                />
               </div>
               <ProfileTextInput
                 label="旅行伙伴"
@@ -302,7 +362,7 @@ export function MaimaiPage({
               </div>
             </Card>
           ) : null}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Card className="border-border bg-card p-5">
               <p className="text-sm font-medium text-muted-foreground">
                 当前搭档
@@ -314,6 +374,28 @@ export function MaimaiPage({
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
                 来自机台同步的 partnerId。
+              </p>
+            </Card>
+            <Card className="border-border bg-card p-5">
+              <p className="text-sm font-medium text-muted-foreground">
+                当前 maimile · point
+              </p>
+              <p className="mt-2 text-3xl font-black text-neutral-400">
+                {stats?.user?.point?.toLocaleString() ?? "—"}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                机台可用的 maimile 余额。
+              </p>
+            </Card>
+            <Card className="border-border bg-card p-5">
+              <p className="text-sm font-medium text-muted-foreground">
+                累计 maimile · totalPoint
+              </p>
+              <p className="mt-2 text-3xl font-black text-neutral-400">
+                {stats?.user?.totalPoint?.toLocaleString() ?? "—"}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                对应数据库与机台协议字段 total_point。
               </p>
             </Card>
             <Card className="border-border bg-card p-5">
@@ -331,6 +413,35 @@ export function MaimaiPage({
               </p>
             </Card>
           </div>
+
+          <ProfileTable
+            title="档案字段"
+            empty="尚无档案字段。"
+            headers={["字段", "值"]}
+            rows={
+              stats?.user
+                ? [
+                    ["iconId", stats.user.iconId],
+                    ["plateId", stats.user.plateId],
+                    ["titleId", stats.user.titleId],
+                    ["frameId", stats.user.frameId],
+                    ["selectMapId", stats.user.selectMapId],
+                    ["mapStock", stats.user.mapStock],
+                    ["renameCredit", stats.user.renameCredit],
+                    ["playCount", stats.user.playCount],
+                    ["currentPlayCount", stats.user.currentPlayCount],
+                    ["gradeRating", stats.user.gradeRating],
+                    ["musicRating", stats.user.musicRating],
+                    ["gradeRank", stats.user.gradeRank],
+                    ["classRank", stats.user.classRank],
+                    ["courseRank", stats.user.courseRank],
+                    ["lastRomVersion", stats.user.lastRomVersion || "—"],
+                    ["lastDataVersion", stats.user.lastDataVersion || "—"],
+                    ["lastPlayDate", stats.user.lastPlayDate || "—"],
+                  ]
+                : []
+            }
+          />
 
           <ProfileTable
             title="旅行伙伴"
@@ -377,6 +488,31 @@ interface ProfileTextInputProps {
   hint: string
   value: string
   onChange: (value: string) => void
+}
+
+function ProfileNumberInput({
+  label,
+  field,
+  value,
+  onChange,
+}: {
+  label: string
+  field: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="block text-sm font-medium text-muted-foreground">
+      {label}
+      <span className="ml-1 font-mono text-xs">· {field}</span>
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        inputMode="numeric"
+        className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-foreground outline-none focus:border-neutral-500"
+      />
+    </label>
+  )
 }
 
 function ProfileTextInput({

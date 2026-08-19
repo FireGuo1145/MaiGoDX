@@ -1,4 +1,4 @@
-import { Award, TrendingUp } from "lucide-react"
+import { Award, Coins, Gamepad2, TrendingUp } from "lucide-react"
 import {
   Line,
   LineChart,
@@ -88,14 +88,14 @@ function RatingList({
 export function DashboardPage({ stats, metadata }: DashboardPageProps) {
   const rating = stats?.user?.playerRating
   const maxRating = stats?.user?.highestRating
-  const playCount = stats?.totalPlays
+  const playCount = stats?.user?.playCount
   const trend = [...(stats?.trend ?? [])].sort((left, right) =>
     left.date.localeCompare(right.date)
   )
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>当前 Rating</CardDescription>
@@ -119,7 +119,21 @@ export function DashboardPage({ stats, metadata }: DashboardPageProps) {
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              已关联档案的成绩记录数
+              机台档案记录的累计游玩次数
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>当前 maimile</CardDescription>
+            <CardTitle className="flex items-center gap-2 text-3xl">
+              <Coins size={24} />
+              {stats?.user?.point?.toLocaleString() ?? "—"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              累计：{stats?.user?.totalPoint?.toLocaleString() ?? "—"}
             </p>
           </CardContent>
         </Card>
@@ -137,6 +151,33 @@ export function DashboardPage({ stats, metadata }: DashboardPageProps) {
           </CardContent>
         </Card>
       </div>
+
+      {stats?.user && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Gamepad2 size={20} />
+              档案明细
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-x-8 gap-y-4 md:grid-cols-4">
+            <Detail label="段位 Rating" value={stats.user.gradeRating} />
+            <Detail label="乐曲 Rating" value={stats.user.musicRating} />
+            <Detail label="段位等级" value={stats.user.gradeRank} />
+            <Detail label="Class Rank" value={stats.user.classRank} />
+            <Detail label="累计 DX 分数" value={stats.user.totalDeluxscore} />
+            <Detail label="累计达成率" value={stats.user.totalAchievement} />
+            <Detail
+              label="最后游玩地点"
+              value={stats.user.lastPlaceName || "—"}
+            />
+            <Detail
+              label="最后游玩时间"
+              value={stats.user.lastPlayDate || "—"}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <RatingList
@@ -187,6 +228,17 @@ export function DashboardPage({ stats, metadata }: DashboardPageProps) {
           )}
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function Detail({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 truncate font-mono font-medium" title={String(value)}>
+        {typeof value === "number" ? value.toLocaleString() : value}
+      </p>
     </div>
   )
 }
