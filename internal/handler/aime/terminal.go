@@ -1,4 +1,4 @@
-package handler
+package aime
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
+	"github.com/FireGuo1145/MaiGoDX/internal/handler/maimai"
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
 )
 
@@ -165,7 +166,7 @@ func HandleTerminalMaimai(w http.ResponseWriter, r *http.Request) {
 	// controller's canonical /g/... route before dispatching the game API.
 	r.URL.Path = "/g/" + strings.Join(parts[2:], "/")
 	r.URL.RawPath = ""
-	MaimaiHandler(w, r)
+	maimai.MaimaiHandler(w, r)
 }
 
 func allNetKeychipProtectionEnabled() bool {
@@ -303,6 +304,23 @@ func isKeychipRegistrationFormat(value string) bool {
 		}
 	}
 	return true
+}
+
+// IsKeychipRegistrationFormat validates the Keychip format used by portal
+// terminal management handlers.
+func IsKeychipRegistrationFormat(value string) bool {
+	return isKeychipRegistrationFormat(value)
+}
+
+// FormatKeychip returns the canonical hyphenated Keychip representation.
+func FormatKeychip(value string) string {
+	return formatKeychip(value)
+}
+
+// FindStoredTerminalByKeychipPrefix includes soft-deleted terminals so the
+// portal can safely restore a previous registration.
+func FindStoredTerminalByKeychipPrefix(value string) (model.Terminal, bool, error) {
+	return findStoredTerminalByKeychipPrefix(value)
 }
 
 func clientIP(r *http.Request) string {

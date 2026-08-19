@@ -1,4 +1,11 @@
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useState } from "react"
 import { MonitorCog, Plus, Power, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -11,6 +18,11 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import api from "@/lib/api"
+import {
+  DEFAULT_TERMINAL_GAME_ID,
+  TERMINAL_GAMES,
+  terminalGameLabel,
+} from "@/lib/terminal-games"
 import type { Terminal } from "@/types"
 import { apiErrorMessage } from "@/types"
 
@@ -19,12 +31,10 @@ interface TerminalPanelProps {
   onChanged: () => Promise<void>
 }
 
-const defaultGameID = "SDEZ"
-
 export function TerminalPanel({ terminals, onChanged }: TerminalPanelProps) {
   const [keychipId, setKeychipId] = useState("")
   const [name, setName] = useState("")
-  const [gameID, setGameID] = useState(defaultGameID)
+  const [gameID, setGameID] = useState(DEFAULT_TERMINAL_GAME_ID)
   const [gameVersion, setGameVersion] = useState("")
   const [notice, setNotice] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -133,14 +143,21 @@ export function TerminalPanel({ terminals, onChanged }: TerminalPanelProps) {
               className="h-10 rounded-md border border-border bg-muted px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
             />
             <div className="grid grid-cols-2 gap-2">
-              <Input
-                value={gameID}
-                onChange={(event) =>
-                  setGameID(event.target.value.toUpperCase())
-                }
-                placeholder="游戏 ID"
-                className="h-10 rounded-md border border-border bg-muted px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
-              />
+              <Select
+                selectedKey={gameID}
+                onSelectionChange={(key) => setGameID(String(key))}
+              >
+                <SelectTrigger className="h-10 rounded-md border border-border bg-muted px-3 text-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TERMINAL_GAMES.map((game) => (
+                    <SelectItem key={game.id} id={game.id}>
+                      {game.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
                 value={gameVersion}
                 onChange={(event) => setGameVersion(event.target.value)}
@@ -192,7 +209,9 @@ export function TerminalPanel({ terminals, onChanged }: TerminalPanelProps) {
                 <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                   <p>
                     游戏：
-                    <span className="text-foreground">{terminal.gameId}</span>
+                    <span className="text-foreground">
+                      {terminalGameLabel(terminal.gameId)}
+                    </span>
                   </p>
                   <p>
                     版本：

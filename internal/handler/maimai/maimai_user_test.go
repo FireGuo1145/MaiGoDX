@@ -1,4 +1,4 @@
-package handler
+package maimai
 
 import (
 	"encoding/base64"

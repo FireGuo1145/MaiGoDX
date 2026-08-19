@@ -1,7 +1,19 @@
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useEffect, useState, type FormEvent } from "react"
 import { MonitorCog, Plus, Save, Trash2 } from "lucide-react"
 import api from "@/lib/api"
+import {
+  DEFAULT_TERMINAL_GAME_ID,
+  isTerminalGameID,
+  TERMINAL_GAMES,
+} from "@/lib/terminal-games"
 import { apiErrorMessage, type Terminal } from "@/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -61,14 +73,29 @@ function TerminalEditor({
             placeholder="机台名称"
             className="h-10 rounded-md border border-border bg-muted px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
           />
-          <Input
-            value={draft.gameId}
-            onChange={(event) =>
-              setDraft({ ...draft, gameId: event.target.value.toUpperCase() })
+          <Select
+            selectedKey={
+              isTerminalGameID(draft.gameId) ? draft.gameId : null
             }
-            placeholder="游戏 ID"
-            className="h-10 rounded-md border border-border bg-muted px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
-          />
+            onSelectionChange={(key) =>
+              setDraft({ ...draft, gameId: String(key) })
+            }
+          >
+            <SelectTrigger className="h-10 rounded-md border border-border bg-muted px-3 text-foreground">
+              <SelectValue>
+                {isTerminalGameID(draft.gameId)
+                  ? undefined
+                  : "请选择受支持的游戏"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {TERMINAL_GAMES.map((game) => (
+                <SelectItem key={game.id} id={game.id}>
+                  {game.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Input
             value={draft.gameVersion}
             onChange={(event) =>
@@ -114,7 +141,7 @@ export function PersonalTerminalPanel() {
   const [terminals, setTerminals] = useState<Terminal[]>([])
   const [keychipId, setKeychipId] = useState("")
   const [name, setName] = useState("")
-  const [gameId, setGameId] = useState("SDEZ")
+  const [gameId, setGameId] = useState(DEFAULT_TERMINAL_GAME_ID)
   const [gameVersion, setGameVersion] = useState("")
   const [notice, setNotice] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -147,7 +174,7 @@ export function PersonalTerminalPanel() {
       if (!result.success) throw new Error(result.message || "机台绑定失败")
       setKeychipId("")
       setName("")
-      setGameId("SDEZ")
+      setGameId(DEFAULT_TERMINAL_GAME_ID)
       setGameVersion("")
       await refresh()
       setNotice(
@@ -225,12 +252,21 @@ export function PersonalTerminalPanel() {
             className="h-10 rounded-md border border-border bg-muted px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
           />
           <div className="grid grid-cols-2 gap-2">
-            <Input
-              value={gameId}
-              onChange={(event) => setGameId(event.target.value.toUpperCase())}
-              placeholder="游戏 ID"
-              className="h-10 rounded-md border border-border bg-muted px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
-            />
+            <Select
+              selectedKey={gameId}
+              onSelectionChange={(key) => setGameId(String(key))}
+            >
+              <SelectTrigger className="h-10 rounded-md border border-border bg-muted px-3 text-foreground">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TERMINAL_GAMES.map((game) => (
+                  <SelectItem key={game.id} id={game.id}>
+                    {game.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input
               value={gameVersion}
               onChange={(event) => setGameVersion(event.target.value)}

@@ -1,4 +1,4 @@
-export type PageId = 'home' | 'dashboard' | 'maimai' | 'setup' | 'admin' | 'settings'
+export type PageId = 'home' | 'maimai' | 'setup' | 'admin' | 'settings'
 export type AuthMode = 'login' | 'register' | 'verify'
 
 export interface UserAccount {

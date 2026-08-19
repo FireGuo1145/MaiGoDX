@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import api from "@/lib/api"
+import { DashboardPage } from "@/pages/DashboardPage"
 import {
   apiErrorMessage,
   RANK_SUMMARY,
@@ -119,8 +120,11 @@ export function MaimaiPage({
 
   return (
     <div className="space-y-6">
-      <Tabs defaultSelectedKey="recent" className="w-full">
+      <Tabs defaultSelectedKey="overview" className="w-full">
         <TabsList className="border border-border bg-card">
+          <TabsTrigger id="overview" className="data-[selected]:bg-neutral-600">
+            概览
+          </TabsTrigger>
           <TabsTrigger id="recent" className="data-[selected]:bg-neutral-600">
             最近游玩
           </TabsTrigger>
@@ -131,6 +135,10 @@ export function MaimaiPage({
             游戏档案
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent id="overview" className="mt-6">
+          <DashboardPage stats={stats} metadata={metadata} />
+        </TabsContent>
 
         <TabsContent id="recent" className="mt-6">
           <Card className="overflow-hidden border-border bg-card">

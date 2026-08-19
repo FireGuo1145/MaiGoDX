@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
+	"github.com/FireGuo1145/MaiGoDX/internal/handler/maimai"
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
 	"gorm.io/gorm"
 )
@@ -356,13 +357,13 @@ func rankCounts(plays []model.UserPlaylog) map[string]int {
 
 func makeRatingComposition(userID int64) map[string]interface{} {
 	return map[string]interface{}{
-		"bests":    ratingSongs(userID, ratingKeyCurrent),
-		"newBests": ratingSongs(userID, ratingKeyNew),
+		"bests":    ratingSongs(userID, false),
+		"newBests": ratingSongs(userID, true),
 	}
 }
 
-func ratingSongs(userID int64, key string) []portalSong {
-	rates := loadRateData(userID, key)
+func ratingSongs(userID int64, isNew bool) []portalSong {
+	rates := maimai.CurrentRatingRates(userID, isNew)
 	songs := make([]portalSong, 0, len(rates))
 	for _, rate := range rates {
 		song := portalSong{MusicID: rate.MusicID, Level: rate.Level, Achievement: rate.Achievement}

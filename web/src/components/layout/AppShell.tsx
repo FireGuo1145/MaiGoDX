@@ -4,7 +4,6 @@ import {
   CreditCard,
   Gamepad2,
   Home,
-  LayoutDashboard,
   LogOut,
   Menu,
   Server,
@@ -52,7 +51,6 @@ interface NavigationItem {
 
 const navigation: NavigationItem[] = [
   { id: "home", label: "主页", icon: Home },
-  { id: "dashboard", label: "概览", icon: LayoutDashboard },
   { id: "maimai", label: "maimai DX", icon: Gamepad2 },
   { id: "setup", label: "接入指南", icon: Server },
   { id: "admin", label: "管理后台", icon: Users, adminOnly: true },
@@ -227,7 +225,6 @@ export function AppShell({
 
 export const pageIcons = {
   Home,
-  LayoutDashboard,
   Gamepad2,
   Server,
   BookOpen,

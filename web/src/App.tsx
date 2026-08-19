@@ -10,7 +10,6 @@ import { AppShell } from "@/components/layout/AppShell"
 import api from "@/lib/api"
 import { AdminPage } from "@/pages/AdminPage"
 import { AuthPage } from "@/pages/AuthPage"
-import { DashboardPage } from "@/pages/DashboardPage"
 import { HomePage } from "@/pages/HomePage"
 import { MaimaiPage } from "@/pages/MaimaiPage"
 import { SettingsPage } from "@/pages/SettingsPage"
@@ -31,7 +30,6 @@ import { apiErrorMessage } from "@/types"
 
 const pageTitles: Record<PageId, string> = {
   home: "主页",
-  dashboard: "概览",
   maimai: "maimai DX",
   setup: "接入指南",
   admin: "管理后台",
@@ -40,7 +38,6 @@ const pageTitles: Record<PageId, string> = {
 
 const pagePaths: Record<PageId, string> = {
   home: "/",
-  dashboard: "/dashboard",
   maimai: "/maimai",
   setup: "/setup",
   admin: "/admin",
@@ -240,7 +237,7 @@ export default function App() {
         siteName={siteName}
         onAuthenticated={(account) => {
           setUser(account)
-          navigate("/dashboard", { replace: true })
+          navigate("/", { replace: true })
         }}
       />
     )
@@ -263,10 +260,7 @@ export default function App() {
     >
       <Routes>
         <Route path="/" element={<HomePage stats={stats} />} />
-        <Route
-          path="/dashboard"
-          element={<DashboardPage stats={stats} metadata={metadata} />}
-        />
+        <Route path="/dashboard" element={<Navigate to="/maimai" replace />} />
         <Route
           path="/maimai"
           element={

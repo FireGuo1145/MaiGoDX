@@ -84,7 +84,7 @@ export function SettingsPage({
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="w-full">
       <Tabs defaultSelectedKey="account" className="space-y-6">
         <TabsList className="w-full justify-start overflow-x-auto rounded-xl border border-border bg-card p-1">
           <TabsTrigger

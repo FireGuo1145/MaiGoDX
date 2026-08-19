@@ -368,6 +368,10 @@ const siteConfigKeys = new Set([
   "email_smtp_from",
 ])
 
+function isAimeConfig(config: SystemConfig) {
+  return config.key.startsWith("allnet_")
+}
+
 export function AdminPage({
   users,
   configs,
@@ -546,10 +550,22 @@ export function AdminPage({
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">站点管理</h2>
             <p className="text-sm text-muted-foreground">
-              游戏 ID 与名称的显示元数据
+              按游戏维护 ID 与名称的显示元数据
             </p>
           </div>
-          <MetadataPanel onChanged={onMetadataChanged} />
+          <Tabs defaultSelectedKey="maimai" className="space-y-4">
+            <TabsList className="w-full justify-start overflow-x-auto rounded-xl border border-border bg-card p-1">
+              <TabsTrigger
+                id="maimai"
+                className="min-w-fit rounded-lg px-3 text-muted-foreground data-selected:text-foreground"
+              >
+                maimai DX
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent id="maimai">
+              <MetadataPanel onChanged={onMetadataChanged} />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent id="advanced" className="space-y-6">
@@ -567,15 +583,28 @@ export function AdminPage({
               刷新配置
             </Button>
           </div>
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-sm text-foreground">
-                游戏与服务器高级配置
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Tabs defaultSelectedKey="aime" className="space-y-4">
+            <TabsList className="w-full justify-start overflow-x-auto rounded-xl border border-border bg-card p-1">
+              <TabsTrigger
+                id="aime"
+                className="min-w-fit rounded-lg px-3 text-muted-foreground data-selected:text-foreground"
+              >
+                Aime
+              </TabsTrigger>
+              <TabsTrigger
+                id="maimai"
+                className="min-w-fit rounded-lg px-3 text-muted-foreground data-selected:text-foreground"
+              >
+                maimai DX
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent id="aime" className="space-y-4">
               {configs
-                .filter((config) => !siteConfigKeys.has(config.key))
+                .filter(
+                  (config) =>
+                    !siteConfigKeys.has(config.key) && isAimeConfig(config)
+                )
                 .map((config) => (
                   <ConfigRow
                     key={config.ID}
@@ -583,8 +612,23 @@ export function AdminPage({
                     onSaved={onConfigsChanged}
                   />
                 ))}
-            </CardContent>
-          </Card>
+            </TabsContent>
+
+            <TabsContent id="maimai" className="space-y-4">
+              {configs
+                .filter(
+                  (config) =>
+                    !siteConfigKeys.has(config.key) && !isAimeConfig(config)
+                )
+                .map((config) => (
+                  <ConfigRow
+                    key={config.ID}
+                    config={config}
+                    onSaved={onConfigsChanged}
+                  />
+                ))}
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>

@@ -1,4 +1,4 @@
-package handler
+package maimai
 
 import (
 	"bytes"
@@ -288,6 +288,14 @@ func loadRateData(userID int64, key string) []model.UserRate {
 		}
 	}
 	return rates
+}
+
+// CurrentRatingRates returns the saved rating composition used by the portal.
+func CurrentRatingRates(userID int64, isNew bool) []model.UserRate {
+	if isNew {
+		return loadRateData(userID, ratingKeyNew)
+	}
+	return loadRateData(userID, ratingKeyCurrent)
 }
 
 func isStaticMaimaiAPI(apiName string) bool {

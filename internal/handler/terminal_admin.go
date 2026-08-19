@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
+	"github.com/FireGuo1145/MaiGoDX/internal/handler/aime"
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
 
 	"gorm.io/gorm"
@@ -43,21 +44,22 @@ func HandleCreateTerminal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	keychipInput := strings.TrimSpace(request.KeychipID)
-	if !isKeychipRegistrationFormat(keychipInput) {
+	if !aime.IsKeychipRegistrationFormat(keychipInput) {
 		writeTerminalError(w, http.StatusBadRequest, "Keychip 格式必须为 Axxx-xxxxxxxxxxx")
 		return
 	}
-	keychip := formatKeychip(keychipInput)
-	gameID := strings.ToUpper(strings.TrimSpace(request.GameID))
-	if gameID == "" {
-		gameID = "SDEZ"
+	keychip := aime.FormatKeychip(keychipInput)
+	gameID, supported := aime.NormalizeTerminalGameID(request.GameID)
+	if !supported {
+		writeTerminalError(w, http.StatusBadRequest, "不支持的游戏 ID")
+		return
 	}
 	owner := request.OwnerAccountID
 	if owner == 0 {
 		owner = account.ID
 	}
 	terminal := model.Terminal{KeychipID: keychip, Name: strings.TrimSpace(request.Name), GameID: gameID, GameVersion: strings.TrimSpace(request.GameVersion), OwnerAccountID: owner, IsEnabled: true}
-	existing, found, lookupErr := findStoredTerminalByKeychipPrefix(keychip)
+	existing, found, lookupErr := aime.FindStoredTerminalByKeychipPrefix(keychip)
 	if lookupErr != nil {
 		writeTerminalError(w, http.StatusInternalServerError, "检查 Keychip 失败")
 		return
@@ -109,13 +111,15 @@ func HandleUpdateTerminal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	terminal.Name = strings.TrimSpace(request.Name)
-	terminal.GameID = strings.ToUpper(strings.TrimSpace(request.GameID))
+	gameID, supported := aime.NormalizeTerminalGameID(request.GameID)
+	if !supported {
+		writeTerminalError(w, http.StatusBadRequest, "不支持的游戏 ID")
+		return
+	}
+	terminal.GameID = gameID
 	terminal.GameVersion = strings.TrimSpace(request.GameVersion)
 	terminal.OwnerAccountID = request.OwnerAccountID
 	terminal.IsEnabled = request.IsEnabled
-	if terminal.GameID == "" {
-		terminal.GameID = "SDEZ"
-	}
 	if err := database.DB.Save(&terminal).Error; err != nil {
 		writeTerminalError(w, http.StatusInternalServerError, "保存机台失败")
 		return
