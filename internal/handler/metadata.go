@@ -27,7 +27,15 @@ type metadataPayload struct {
 	Skipped  int                      `json:"-"`
 }
 
-var metadataNames = map[string]string{"music": "歌曲列表", "partner": "搭档列表", "ticket": "功能票列表", "chara": "旅行伙伴列表"}
+var metadataNames = map[string]string{
+	"music":            "maimai 歌曲列表",
+	"partner":          "maimai 搭档列表",
+	"ticket":           "maimai 功能票列表",
+	"chara":            "maimai 旅行伙伴列表",
+	"ongeki_music":     "Ongeki 歌曲列表",
+	"ongeki_card":      "Ongeki 卡片列表",
+	"ongeki_character": "Ongeki 角色列表",
+}
 
 func normalizeMetadataName(v string) (string, bool) {
 	v = strings.ToLower(strings.TrimSpace(v))
@@ -104,9 +112,13 @@ func HandleAdminMetadataImport(w http.ResponseWriter, r *http.Request) {
 		metadataError(w, 400, "XML 格式解析失败")
 		return
 	}
-	name, ok := normalizeMetadataName(parsed.DataName)
+	dataName := parsed.DataName
+	if strings.EqualFold(strings.TrimSpace(r.FormValue("game")), "ongeki") {
+		dataName = "ongeki_" + strings.ToLower(strings.TrimSpace(dataName))
+	}
+	name, ok := normalizeMetadataName(dataName)
 	if !ok {
-		metadataError(w, 400, "不支持的 dataName，仅支持 music、partner、ticket、chara")
+		metadataError(w, 400, "不支持的 dataName")
 		return
 	}
 	itemsByID := make(map[int64]model.SiteMetadataItem, len(parsed.SortList))

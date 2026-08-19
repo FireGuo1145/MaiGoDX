@@ -6,18 +6,26 @@ import api from "@/lib/api"
 import type { MetadataItem } from "@/types"
 import { apiErrorMessage } from "@/types"
 
-const kinds = [
+const maimaiKinds = [
   { id: "music", label: "歌曲列表" },
   { id: "partner", label: "搭档列表" },
   { id: "ticket", label: "功能票列表" },
   { id: "chara", label: "旅行伙伴列表" },
 ]
+const ongekiKinds = [
+  { id: "ongeki_music", label: "歌曲列表" },
+  { id: "ongeki_card", label: "卡片列表" },
+  { id: "ongeki_character", label: "角色列表" },
+]
 export function MetadataPanel({
   onChanged,
+  game = "maimai",
 }: {
   onChanged: () => Promise<void>
+  game?: "maimai" | "ongeki"
 }) {
-  const [kind, setKind] = useState("music")
+  const kinds = game === "ongeki" ? ongekiKinds : maimaiKinds
+  const [kind, setKind] = useState(kinds[0].id)
   const [data, setData] = useState<Record<string, MetadataItem[]>>({})
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -32,7 +40,18 @@ export function MetadataPanel({
     }
   }
   useEffect(() => {
-    void refresh()
+    let active = true
+    void api
+      .getMetadata()
+      .then((result) => {
+        if (active && result.success) setData(result.metadata || {})
+      })
+      .catch((error) => {
+        if (active) setStatus(apiErrorMessage(error))
+      })
+    return () => {
+      active = false
+    }
   }, [])
   const update = (index: number, field: "id" | "name", value: string) => {
     const next = [...items]
@@ -66,7 +85,7 @@ export function MetadataPanel({
     setBusy(true)
     setStatus(null)
     try {
-      const result = await api.importMetadata(file)
+      const result = await api.importMetadata(file, game)
       if (!result.success) throw new Error(result.message || "导入失败")
       await refresh()
       await onChanged()

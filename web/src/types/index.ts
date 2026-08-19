@@ -1,5 +1,5 @@
 export type PageId =
-  "home" | "maimai" | "chunithm" | "setup" | "admin" | "settings"
+  "home" | "maimai" | "chunithm" | "ongeki" | "setup" | "admin" | "settings"
 export type AuthMode = "login" | "register" | "verify"
 
 export interface UserAccount {
@@ -233,6 +233,17 @@ export interface ChuniStats {
 
 export interface ChuniStatsResult extends ApiResult, ChuniStats {}
 
+export interface OngekiStats {
+  selectedCardId?: number
+  userId?: number
+  profile?: Record<string, unknown>
+  recentPlays: Array<Record<string, unknown>>
+  musicDetails: Array<Record<string, unknown>>
+  message?: string
+}
+
+export interface OngekiStatsResult extends ApiResult, OngekiStats {}
+
 export interface AuthNotice {
   text: string
   developmentToken?: string
@@ -243,6 +254,7 @@ export const API_PATHS = {
   siteMetadata: "/api/site/metadata",
   stats: "/api/stats",
   chuniStats: "/api/chunithm/stats",
+  ongekiStats: "/api/ongeki/stats",
   updateProfile: "/api/maimai/profile/update",
   adjustTicket: "/api/maimai/profile/ticket/adjust",
   login: "/api/auth/login",

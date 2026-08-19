@@ -16,6 +16,7 @@ import (
 	"github.com/FireGuo1145/MaiGoDX/internal/database"
 	"github.com/FireGuo1145/MaiGoDX/internal/handler/chunithm"
 	"github.com/FireGuo1145/MaiGoDX/internal/handler/maimai"
+	"github.com/FireGuo1145/MaiGoDX/internal/handler/ongeki"
 	"github.com/FireGuo1145/MaiGoDX/internal/model"
 )
 
@@ -170,6 +171,8 @@ func HandleTerminalMaimai(w http.ResponseWriter, r *http.Request) {
 	switch strings.ToUpper(session.GameID) {
 	case "SDHD", "SDGS":
 		chunithm.Handler(w, r)
+	case "SDDT":
+		ongeki.Handler(w, r)
 	default:
 		maimai.MaimaiHandler(w, r)
 	}

@@ -376,6 +376,10 @@ function isChuniConfig(config: SystemConfig) {
   return config.key.startsWith("chuni_")
 }
 
+function isOngekiConfig(config: SystemConfig) {
+  return config.key.startsWith("ongeki_")
+}
+
 export function AdminPage({
   users,
   configs,
@@ -565,9 +569,18 @@ export function AdminPage({
               >
                 maimai DX
               </TabsTrigger>
+              <TabsTrigger
+                id="ongeki"
+                className="min-w-fit rounded-lg px-3 text-muted-foreground data-selected:text-foreground"
+              >
+                Ongeki
+              </TabsTrigger>
             </TabsList>
             <TabsContent id="maimai">
               <MetadataPanel onChanged={onMetadataChanged} />
+            </TabsContent>
+            <TabsContent id="ongeki">
+              <MetadataPanel game="ongeki" onChanged={onMetadataChanged} />
             </TabsContent>
           </Tabs>
         </TabsContent>
@@ -607,6 +620,12 @@ export function AdminPage({
               >
                 CHUNITHM
               </TabsTrigger>
+              <TabsTrigger
+                id="ongeki"
+                className="min-w-fit rounded-lg px-3 text-muted-foreground data-selected:text-foreground"
+              >
+                Ongeki
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent id="aime" className="space-y-4">
@@ -630,7 +649,8 @@ export function AdminPage({
                   (config) =>
                     !siteConfigKeys.has(config.key) &&
                     !isAimeConfig(config) &&
-                    !isChuniConfig(config)
+                    !isChuniConfig(config) &&
+                    !isOngekiConfig(config)
                 )
                 .map((config) => (
                   <ConfigRow
@@ -646,6 +666,21 @@ export function AdminPage({
                 .filter(
                   (config) =>
                     !siteConfigKeys.has(config.key) && isChuniConfig(config)
+                )
+                .map((config) => (
+                  <ConfigRow
+                    key={config.ID}
+                    config={config}
+                    onSaved={onConfigsChanged}
+                  />
+                ))}
+            </TabsContent>
+
+            <TabsContent id="ongeki" className="space-y-4">
+              {configs
+                .filter(
+                  (config) =>
+                    !siteConfigKeys.has(config.key) && isOngekiConfig(config)
                 )
                 .map((config) => (
                   <ConfigRow

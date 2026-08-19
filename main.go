@@ -57,6 +57,7 @@ func main() {
 	mux.HandleFunc("/api/card/list", handler.HandleGetUserCards)
 	mux.HandleFunc("/api/stats", handler.HandleGetStats)
 	mux.HandleFunc("/api/chunithm/stats", handler.HandleGetChuniStats)
+	mux.HandleFunc("/api/ongeki/stats", handler.HandleGetOngekiStats)
 	mux.HandleFunc("/api/maimai/profile/update", handler.HandleUpdatePortalProfile)
 	mux.HandleFunc("/api/maimai/profile/ticket/adjust", handler.HandleAdjustPortalFunctionTicket)
 	mux.HandleFunc("/sys/test", handler.HandleAllNetSelfTest)
@@ -78,6 +79,8 @@ func main() {
 		if strings.HasPrefix(path, "/g/") || strings.HasPrefix(path, "/api/") {
 			if strings.HasPrefix(path, "/g/SDHD/") || strings.HasPrefix(path, "/g/SDGS/") {
 				handler.ChuniHandler(w, r)
+			} else if strings.HasPrefix(path, "/g/SDDT/") || path == "/g/SDDT" {
+				handler.OngekiHandler(w, r)
 			} else if strings.HasPrefix(path, "/g/") {
 				handler.MaimaiHandler(w, r)
 			}

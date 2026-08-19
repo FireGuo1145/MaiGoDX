@@ -13,6 +13,7 @@ import { AuthPage } from "@/pages/AuthPage"
 import { HomePage } from "@/pages/HomePage"
 import { MaimaiPage } from "@/pages/MaimaiPage"
 import { ChuniPage } from "@/pages/ChuniPage"
+import { OngekiPage } from "@/pages/OngekiPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { SetupPage } from "@/pages/SetupPage"
 import type {
@@ -27,6 +28,7 @@ import type {
   UserAccount,
   UserCard,
   ChuniStats,
+  OngekiStats,
 } from "@/types"
 import { apiErrorMessage } from "@/types"
 
@@ -34,6 +36,7 @@ const pageTitles: Record<PageId, string> = {
   home: "主页",
   maimai: "maimai DX",
   chunithm: "CHUNITHM",
+  ongeki: "Ongeki",
   setup: "接入指南",
   admin: "管理后台",
   settings: "设置",
@@ -43,6 +46,7 @@ const pagePaths: Record<PageId, string> = {
   home: "/",
   maimai: "/maimai",
   chunithm: "/chunithm",
+  ongeki: "/ongeki",
   setup: "/setup",
   admin: "/admin",
   settings: "/settings",
@@ -73,6 +77,7 @@ export default function App() {
   )
   const [stats, setStats] = useState<Stats | null>(null)
   const [chuniStats, setChuniStats] = useState<ChuniStats | null>(null)
+  const [ongekiStats, setOngekiStats] = useState<OngekiStats | null>(null)
   const [selectedProfileCardID, setSelectedProfileCardID] = useState<
     number | undefined
   >()
@@ -164,6 +169,16 @@ export default function App() {
     }
   }
 
+  const refreshOngekiStats = async (cardID = selectedProfileCardID) => {
+    if (!user) return
+    try {
+      const result = await api.getOngekiStats(cardID)
+      if (result.success) setOngekiStats(result)
+    } catch (error) {
+      console.error("Failed to load Ongeki stats:", apiErrorMessage(error))
+    }
+  }
+
   const refreshUsers = async () => {
     try {
       const result = await api.getUsers()
@@ -215,6 +230,7 @@ export default function App() {
     if (!user) return
     void refreshStats()
     void refreshChuniStats()
+    void refreshOngekiStats()
     void refreshCards()
     if (user.isAdmin) {
       void refreshUsers()
@@ -230,6 +246,7 @@ export default function App() {
     setUser(null)
     setStats(null)
     setChuniStats(null)
+    setOngekiStats(null)
     setSelectedProfileCardID(undefined)
     setCards([])
     setUsers([])
@@ -274,6 +291,7 @@ export default function App() {
         setSelectedProfileCardID(cardID)
         void refreshStats(cardID)
         void refreshChuniStats(cardID)
+        void refreshOngekiStats(cardID)
       }}
     >
       <Routes>
@@ -289,9 +307,10 @@ export default function App() {
             />
           }
         />
+        <Route path="/chunithm" element={<ChuniPage stats={chuniStats} />} />
         <Route
-          path="/chunithm"
-          element={<ChuniPage stats={chuniStats} />}
+          path="/ongeki"
+          element={<OngekiPage stats={ongekiStats} metadata={metadata} />}
         />
         <Route path="/setup" element={<SetupPage />} />
         <Route
