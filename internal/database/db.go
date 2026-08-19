@@ -119,6 +119,8 @@ func InitDB() {
 		{Key: "chuni_maintenance_mode", Value: "false", Desc: "CHUNITHM 维护模式开关 (true/false)"},
 		{Key: "chuni_matching_uri", Value: "", Desc: "CHUNITHM 匹配服务器地址；留空使用当前服务地址"},
 		{Key: "chuni_reflector_uri", Value: "", Desc: "CHUNITHM 反射器地址；留空表示不下发"},
+		{Key: "chuni_login_bonus_enable", Value: "false", Desc: "CHUNITHM 是否启用登录奖励 (true/false)"},
+		{Key: "chuni_team_name", Value: "", Desc: "CHUNITHM 默认队伍名称；留空时不加入队伍"},
 		{Key: "chuni_max_count_music", Value: "300", Desc: "CHUNITHM 游戏设置中的最大歌曲数量"},
 		{Key: "chuni_max_count_item", Value: "300", Desc: "CHUNITHM 游戏设置中的最大道具数量"},
 		{Key: "chuni_max_count_character", Value: "300", Desc: "CHUNITHM 游戏设置中的最大角色数量"},

@@ -87,6 +87,41 @@ func TestGameSettingReturnsChuniServletAddress(t *testing.T) {
 	}
 }
 
+func TestGameSettingKeepsSDGSAddress(t *testing.T) {
+	setupTestDB(t)
+	response := httptest.NewRecorder()
+	Handler(response, httptest.NewRequest(http.MethodPost, "/g/SDGS/2.00/ChuniServlet/GetGameSettingApi", bytes.NewBufferString(`{"version":"2.00"}`)))
+	var payload map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	setting := payload["gameSetting"].(map[string]any)
+	if setting["matchingUri"] != "http://example.com/g/SDGS/2.00/ChuniServlet/" {
+		t.Fatalf("matchingUri=%v", setting["matchingUri"])
+	}
+}
+
+func TestLoginBonusAndTeamConfiguration(t *testing.T) {
+	setupTestDB(t)
+	if err := database.DB.Create(&model.SystemConfig{Key: "chuni_login_bonus_enable", Value: "true"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.Create(&model.SystemConfig{Key: "chuni_team_name", Value: "Mai Team"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.Create(&model.ChuniUserRecord{UserID: 1, Kind: "userLoginBonusList", RecordKey: "1", DataJSON: `{"bonusId":1}`}).Error; err != nil {
+		t.Fatal(err)
+	}
+	bonus := pagedResponse("GetUserLoginBonus", 1, map[string]any{})
+	if bonus["length"] != 1 {
+		t.Fatalf("bonus=%v", bonus)
+	}
+	team := userTeam(map[string]any{"playDate": "2026-08-19 00:00:00"}, 1)
+	if team["teamName"] != "Mai Team" {
+		t.Fatalf("team=%v", team)
+	}
+}
+
 func TestGameSettingUsesChuniConfig(t *testing.T) {
 	setupTestDB(t)
 	configs := []model.SystemConfig{

@@ -89,11 +89,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		writePayload(w, gameSetting(r, request))
 	case "GetUserOption":
 		writePayload(w, map[string]any{"userId": userID, "userGameOption": userRecord(userID, "userGameOption")})
+	case "GetUserTeam":
+		writePayload(w, userTeam(request, userID))
 	case "GetUserSymbolChatSetting":
 		values := userRecords(userID, "userSymbolChatSettingList")
 		writePayload(w, map[string]any{"userId": userID, "length": len(values), "nextIndex": -1, "symbolChatInfoList": values})
-	case "GetUserItem", "CMGetUserItem", "GetUserCharacter", "CMGetUserCharacter", "GetUserMapArea", "GetUserCourse", "GetUserCharge", "GetUserDuel", "GetUserGacha", "GetUserActivity", "GetUserRecentRating", "GetUserMate", "GetUserRegion", "GetUserFavoriteItem", "GetUserFavoriteCollection", "GetUserCMission", "GetUserCMissionList", "GetUserLV", "GetUserUC", "GetUserCardPrintError", "CMGetUserCardPrintError", "GetUserLoginBonus":
+	case "GetUserItem", "CMGetUserItem", "GetUserCharacter", "CMGetUserCharacter", "GetUserCourse", "GetUserCharge", "GetUserDuel", "GetUserGacha", "GetUserActivity", "GetUserRecentRating", "GetUserMate", "GetUserRegion", "GetUserFavoriteItem", "GetUserFavoriteCollection", "GetUserCMission", "GetUserCMissionList", "GetUserLV", "GetUserUC", "GetUserCardPrintError", "CMGetUserCardPrintError", "GetUserLoginBonus":
 		writePayload(w, pagedResponse(endpoint, userID, request))
+	case "GetUserMapArea":
+		writePayload(w, userMapArea(userID, request))
 	case "UpsertUserChargelog":
 		handleChargelog(w, request, userID)
 	case "CMUpsertUserGacha":
@@ -114,7 +118,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		writePayload(w, map[string]any{"length": 0, "gameGachaCardList": []any{}})
 	case "GetGameEvent", "GetGameCharge":
 		writePayload(w, gameStaticPayload(endpoint))
-	case "GetGameGacha", "GetGameRanking", "GetGameCourseLevel", "GetGameUCCondition", "GetGameLVConditionOpen", "GetGameLVConditionUnlock", "GetGameMapAreaCondition", "GetGameIdlist", "GetUserRecMusic", "GetUserRecRating", "GetUserTeam", "GetUserNetBattleData", "GetUserNetBattleRankingInfo", "GetUserRivalData", "GetUserRivalMusic", "GetUserPrintedCard", "GetUserCtoCPlay", "GetTeamCourseSetting", "GetTeamCourseRule":
+	case "GetGameGacha", "GetGameRanking", "GetGameCourseLevel", "GetGameUCCondition", "GetGameLVConditionOpen", "GetGameLVConditionUnlock", "GetGameMapAreaCondition", "GetGameIdlist", "GetUserRecMusic", "GetUserRecRating", "GetUserNetBattleData", "GetUserNetBattleRankingInfo", "GetUserRivalData", "GetUserRivalMusic", "GetUserPrintedCard", "GetUserCtoCPlay", "GetTeamCourseSetting", "GetTeamCourseRule":
 		writePayload(w, emptyGamePayload(endpoint, userID))
 	case "GameLogin", "UpsertClientBookkeeping", "UpsertClientDevelop", "UpsertClientPlayTime", "UpsertClientSetting", "UpsertClientTestmode", "UpsertClientUpload", "UserLogout", "CMLogin", "CMLogout":
 		writeResponse(w, endpoint, 1, nil, "")
@@ -198,10 +202,23 @@ func handleGetUserData(w http.ResponseWriter, userID int64) {
 func handleGetUserPreview(w http.ResponseWriter, userID int64) {
 	var profile model.ChuniUser
 	if err := database.DB.Where("user_id = ?", userID).First(&profile).Error; err != nil {
-		writePayload(w, map[string]any{"userId": userID, "isLogin": false})
+		writePayload(w, map[string]any{
+			"userId": userID, "isLogin": false, "userName": "", "playerRating": 0,
+			"level": 0, "exp": 0, "lastGameId": "", "lastRomVersion": "", "lastDataVersion": "",
+			"lastPlayDate": "", "lastLoginDate": "", "banState": 0,
+		})
 		return
 	}
-	writePayload(w, map[string]any{"userId": userID, "userName": profile.UserName, "playerRating": profile.PlayerRating, "isLogin": false, "banState": 0})
+	data := map[string]any{}
+	_ = json.Unmarshal([]byte(profile.ProfileJSON), &data)
+	data["userId"] = userID
+	data["userName"] = profile.UserName
+	data["playerRating"] = profile.PlayerRating
+	data["isLogin"] = false
+	if _, ok := data["banState"]; !ok {
+		data["banState"] = 0
+	}
+	writePayload(w, data)
 }
 
 func handleGetUserMusic(w http.ResponseWriter, userID int64) {
@@ -226,11 +243,15 @@ func gameSetting(r *http.Request, request map[string]any) map[string]any {
 		version = "2.00"
 	}
 	now := time.Now().UTC()
-	base := "http://" + r.Host + "/g/SDHD/" + version + "/ChuniServlet/"
+	gameID := "SDHD"
+	if strings.Contains(strings.ToUpper(r.URL.Path), "/SDGS/") {
+		gameID = "SDGS"
+	}
+	base := "http://" + r.Host + "/g/" + gameID + "/" + version + "/ChuniServlet/"
 	matchingURI := chuniConfig("chuni_matching_uri", base)
 	reflectorURI := chuniConfig("chuni_reflector_uri", "")
 	game := map[string]any{
-		"romVersion": version + ".00", "dataVersion": version + ".00",
+		"romVersion": version, "dataVersion": version,
 		"isMaintenance": strings.EqualFold(chuniConfig("chuni_maintenance_mode", "false"), "true"), "requestInterval": 0,
 		"rebootStartTime": now.Add(-4 * time.Hour).Format("2006-01-02 15:04:05"), "rebootEndTime": now.Add(-3 * time.Hour).Format("2006-01-02 15:04:05"),
 		"isBackgroundDistribute": false,
@@ -242,6 +263,7 @@ func gameSetting(r *http.Request, request map[string]any) map[string]any {
 	}
 	if reflectorURI != "" {
 		game["reflectorUri"] = reflectorURI
+		game["udpHolePunchUri"] = reflectorURI
 	}
 	return map[string]any{"gameSetting": game, "isDumpUpload": false, "isAou": false}
 }
@@ -268,7 +290,43 @@ func pagedResponse(endpoint string, userID int64, request map[string]any) map[st
 			values = filterByInt(values, "kind", requestedKind)
 		}
 	}
+	if endpoint == "GetUserLoginBonus" && !strings.EqualFold(chuniConfig("chuni_login_bonus_enable", "false"), "true") {
+		values = nil
+	}
 	return map[string]any{"userId": userID, "length": len(values), "nextIndex": -1, key: values}
+}
+
+func userMapArea(userID int64, request map[string]any) map[string]any {
+	values := userRecords(userID, "userMapAreaList")
+	requested := map[int]struct{}{}
+	if raw, ok := request["mapAreaIdList"].([]any); ok {
+		for _, item := range raw {
+			if value, ok := item.(map[string]any); ok {
+				requested[intValue(value["mapAreaId"])] = struct{}{}
+			}
+		}
+	}
+	if len(requested) > 0 {
+		filtered := make([]map[string]any, 0, len(values))
+		for _, value := range values {
+			if _, ok := requested[intValue(value["mapAreaId"])]; ok {
+				filtered = append(filtered, value)
+			}
+		}
+		values = filtered
+	}
+	return map[string]any{"userId": userID, "userMapAreaList": values}
+}
+
+func userTeam(request map[string]any, userID int64) map[string]any {
+	teamName := chuniConfig("chuni_team_name", "")
+	if strings.TrimSpace(teamName) == "" {
+		return map[string]any{"userId": userID, "teamId": 0}
+	}
+	return map[string]any{
+		"userId": userID, "teamId": 1, "teamRank": 1, "teamName": teamName,
+		"userTeamPoint": map[string]any{"userId": userID, "teamId": 1, "orderId": 1, "teamPoint": 1, "aggrDate": stringValue(request["playDate"])},
+	}
 }
 
 func emptyGamePayload(endpoint string, userID int64) map[string]any {
